@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Interactive Quran Learning App with verse-by-verse audio playback">
+    <meta name="theme-color" content="#1a472a">
+
+    <title>Hifdh Helper</title>
+
+    <!-- Hafs Font for Mushaf-style display -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="styles.css">
+
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" href="icon-192.png">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="app-header">
+            <h1>Hifdh Helper</h1>
+        </header>
+
+        <!-- Controls Section -->
+        <section class="controls-section">
+            <!-- Verse Range Selection -->
+            <div class="control-group">
+                <h2>Select Verse Range</h2>
+
+                <div class="range-selector">
+                    <!-- Start Selection -->
+                    <div class="selection-column">
+                        <div class="input-group">
+                            <label for="start-surah">Start Surah</label>
+                            <select id="start-surah" class="surah-select">
+                                <!-- Will be populated dynamically -->
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="start-verse">Start Verse</label>
+                            <select id="start-verse" class="verse-select">
+                                <!-- Will be populated dynamically -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- End Selection -->
+                    <div class="selection-column">
+                        <div class="input-group">
+                            <label for="end-surah">End Surah</label>
+                            <select id="end-surah" class="surah-select">
+                                <!-- Will be populated dynamically -->
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="end-verse">End Verse</label>
+                            <select id="end-verse" class="verse-select">
+                                <!-- Will be populated dynamically -->
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Repetition Control -->
+            <div class="control-group">
+                <h2>Lesson Settings</h2>
+
+                <div class="settings-row">
+                    <div class="repeat-control">
+                        <label>Repeat:</label>
+                        <div class="stepper">
+                            <button type="button" id="repeat-decrease" class="stepper-btn" aria-label="Decrease">−</button>
+                            <input
+                                type="number"
+                                id="repeat-count"
+                                min="1"
+                                max="100"
+                                value="3"
+                                class="stepper-input"
+                                inputmode="numeric"
+                            />
+                            <button type="button" id="repeat-increase" class="stepper-btn" aria-label="Increase">+</button>
+                        </div>
+                        <span class="stepper-label">times</span>
+                    </div>
+
+                    <div class="reciter-control">
+                        <label for="reciter-select">Reciter</label>
+                        <select id="reciter-select" class="reciter-select">
+                            <option value="Alafasy_64kbps">Mishary Alafasy</option>
+                            <option value="Husary_64kbps">Mahmoud Al-Hussary</option>
+                            <option value="Minshawy_Murattal_128kbps">Mohamed Al-Minshawy</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Playback Controls -->
+            <div class="control-group">
+                <div class="playback-controls">
+                    <button id="load-lesson" class="btn btn-primary">Load Lesson</button>
+                    <button id="play-pause" class="btn btn-secondary" disabled>
+                        <span id="play-icon">▶</span> Play
+                    </button>
+                    <button id="stop" class="btn btn-secondary" disabled>⏹ Stop</button>
+                </div>
+
+                <div class="progress-info">
+                    <span id="current-progress">Ready to start</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Quran Text Display -->
+        <section class="quran-display">
+            <div id="verses-container" class="verses-container">
+                <p class="placeholder-text">Select verse range and click "Load Lesson" to begin</p>
+            </div>
+        </section>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <p>Loading...</p>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="app.js"></script>
+</body>
+</html>

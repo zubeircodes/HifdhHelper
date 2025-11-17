@@ -1,0 +1,29 @@
+{
+  "name": "Hifdh Helper",
+  "short_name": "Hifdh",
+  "description": "Interactive Quran learning app with verse-by-verse audio playback and repetition",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a472a",
+  "theme_color": "#1a472a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "lifestyle"],
+  "lang": "en",
+  "dir": "rtl",
+  "scope": "/",
+  "screenshots": []
+}

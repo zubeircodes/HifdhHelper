@@ -1,0 +1,689 @@
+/* ==========================================
+   Font Loading - Uthmanic Hafs v22
+   ========================================== */
+
+@font-face {
+    font-family: 'Uthmanic Hafs';
+    src: url('fonts/UthmanicHafs_V22.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* ==========================================
+   Global Styles & Reset
+   ========================================== */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    /* Color Palette - Islamic Green Theme */
+    --primary-color: #1a472a;
+    --primary-light: #2d6a45;
+    --primary-dark: #0f2918;
+    --accent-color: #c9a961;
+    --text-primary: #2c3e50;
+    --text-secondary: #7f8c8d;
+    --background: #f5f6fa;
+    --card-background: #ffffff;
+    --highlight-color: #ffeaa7;
+    --border-color: #dfe6e9;
+    --shadow: rgba(0, 0, 0, 0.1);
+
+    /* Typography */
+    --font-arabic: 'Uthmanic Hafs', 'Traditional Arabic', serif;
+    --font-latin: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+    /* Spacing */
+    --spacing-xs: 0.5rem;
+    --spacing-sm: 1rem;
+    --spacing-md: 1.5rem;
+    --spacing-lg: 2rem;
+    --spacing-xl: 3rem;
+
+    /* Border Radius */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+}
+
+body {
+    font-family: var(--font-latin);
+    background: linear-gradient(135deg, #f5f6fa 0%, #e8ecf1 100%);
+    color: var(--text-primary);
+    min-height: 100vh;
+    line-height: 1.6;
+}
+
+/* ==========================================
+   Container & Layout
+   ========================================== */
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: var(--spacing-md);
+}
+
+/* ==========================================
+   Header
+   ========================================== */
+
+.app-header {
+    text-align: center;
+    padding: var(--spacing-lg) 0;
+    margin-bottom: var(--spacing-lg);
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
+    color: white;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 4px 6px var(--shadow);
+}
+
+.app-header h1 {
+    font-family: var(--font-arabic);
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: var(--spacing-xs);
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.app-header .subtitle {
+    font-size: 1.1rem;
+    opacity: 0.95;
+    font-weight: 300;
+    letter-spacing: 1px;
+}
+
+/* ==========================================
+   Controls Section
+   ========================================== */
+
+.controls-section {
+    background: var(--card-background);
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 2px 8px var(--shadow);
+    margin-bottom: var(--spacing-lg);
+}
+
+.control-group {
+    margin-bottom: var(--spacing-lg);
+    padding-bottom: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.control-group:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.control-group h2 {
+    font-size: 1.3rem;
+    color: var(--primary-color);
+    margin-bottom: var(--spacing-md);
+    font-weight: 600;
+}
+
+/* Range Selector */
+.range-selector {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-lg);
+}
+
+.selection-column {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.input-group label {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.surah-select,
+.verse-select,
+.reciter-select,
+input[type="number"] {
+    padding: 12px 16px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 1rem;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.surah-select:focus,
+.verse-select:focus,
+.reciter-select:focus,
+input[type="number"]:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(26, 71, 42, 0.1), 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.surah-select:hover,
+.verse-select:hover,
+.reciter-select:hover,
+input[type="number"]:hover {
+    border-color: var(--primary-light);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* Settings Row - Repetition & Reciter */
+.settings-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-lg);
+    align-items: start;
+}
+
+/* Repeat Control - Horizontal Stepper */
+.repeat-control {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
+.repeat-control label {
+    font-weight: 500;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.stepper {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: white;
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 4px;
+    transition: border-color 0.2s ease;
+}
+
+.stepper:focus-within {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(26, 71, 42, 0.1);
+}
+
+.stepper-btn {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    border: none;
+    background: var(--primary-color);
+    color: white;
+    font-size: 1.5rem;
+    font-weight: bold;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    padding: 0;
+    touch-action: manipulation;
+    user-select: none;
+}
+
+.stepper-btn:hover {
+    background: var(--primary-light);
+    transform: scale(1.05);
+}
+
+.stepper-btn:active {
+    transform: scale(0.95);
+}
+
+.stepper-input {
+    width: 60px;
+    height: 40px;
+    border: none;
+    background: transparent;
+    text-align: center;
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    -moz-appearance: textfield; /* Remove spinner arrows */
+    padding: 0;
+}
+
+.stepper-input::-webkit-inner-spin-button,
+.stepper-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.stepper-input:focus {
+    outline: none;
+    color: var(--primary-color);
+}
+
+.stepper-label {
+    color: var(--text-secondary);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* Reciter Control */
+.reciter-control {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.reciter-control label {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Playback Controls */
+.playback-controls {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
+.btn {
+    padding: var(--spacing-sm) var(--spacing-lg);
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px var(--shadow);
+}
+
+.btn:active {
+    transform: translateY(1px);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary-color) 100%);
+    box-shadow: 0 4px 8px var(--shadow);
+}
+
+.btn-secondary {
+    background: var(--accent-color);
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #b8964f;
+    box-shadow: 0 4px 8px var(--shadow);
+}
+
+.btn:disabled {
+    background: var(--border-color);
+    color: var(--text-secondary);
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.progress-info {
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-sm);
+    background: var(--background);
+    border-radius: var(--radius-sm);
+    text-align: center;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+/* ==========================================
+   Text Direction Rules
+   ========================================== */
+
+/* Force LTR for all control sections */
+.controls-section,
+.control-group,
+.range-selector,
+.selection-column,
+.input-group,
+.repetition-control,
+.reciter-control,
+.playback-controls,
+.progress-info {
+    direction: ltr;
+    text-align: left;
+}
+
+/* Labels should be on the left */
+.control-group h2,
+.input-group label,
+.repetition-control label,
+.reciter-control label {
+    text-align: left;
+    direction: ltr;
+}
+
+/* Dropdowns and inputs LTR */
+.surah-select,
+.verse-select,
+.reciter-select,
+input[type="number"] {
+    direction: ltr;
+    text-align: left;
+}
+
+/* Only Arabic content should be RTL */
+.app-header h1 {
+    direction: rtl;
+    text-align: center;
+}
+
+/* ==========================================
+   Quran Display
+   ========================================== */
+
+.quran-display {
+    background: var(--card-background);
+    padding: var(--spacing-xl);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 2px 8px var(--shadow);
+    min-height: 400px;
+}
+
+.verses-container {
+    direction: rtl;
+    text-align: right;
+    line-height: 2.5;
+}
+
+.verse {
+    direction: rtl;
+    text-align: right;
+}
+
+.placeholder-text {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    padding: var(--spacing-xl);
+}
+
+/* Verse Styling */
+.verse {
+    font-family: var(--font-arabic);
+    font-size: 2.5rem;
+    line-height: 3.2;
+    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-md);
+    border-radius: var(--radius-sm);
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.verse:hover {
+    background: var(--background);
+}
+
+.verse.active {
+    background: var(--highlight-color);
+    box-shadow: 0 0 0 3px var(--accent-color);
+    transform: scale(1.02);
+}
+
+.verse-number {
+    display: inline-block;
+    font-family: var(--font-latin);
+    font-size: 0.9rem;
+    color: var(--primary-color);
+    background: var(--background);
+    padding: 0.2rem 0.5rem;
+    border-radius: 50%;
+    margin-left: var(--spacing-xs);
+    font-weight: 600;
+}
+
+/* ==========================================
+   Loading Indicator
+   ========================================== */
+
+.loading {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.95);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.loading.hidden {
+    display: none;
+}
+
+.spinner {
+    width: 60px;
+    height: 60px;
+    border: 4px solid var(--border-color);
+    border-top: 4px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading p {
+    margin-top: var(--spacing-md);
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* ==========================================
+   Responsive Design
+   ========================================== */
+
+@media (max-width: 768px) {
+    .app-header h1 {
+        font-size: 2rem;
+    }
+
+    .range-selector {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+    }
+
+    .settings-row {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+    }
+
+    .repeat-control {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .stepper-btn {
+        width: 48px;  /* Larger tap targets */
+        height: 48px;
+        min-width: 48px;
+        min-height: 48px;
+        font-size: 1.8rem;
+    }
+
+    .stepper-input {
+        width: 70px;
+        font-size: 1.5rem;
+    }
+
+    .playback-controls {
+        display: flex;
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+
+    .btn {
+        width: 100%;
+    }
+
+    .verse {
+        font-size: 1.5rem;
+        line-height: 2.2;
+    }
+
+    .container {
+        padding: var(--spacing-sm);
+    }
+
+    .controls-section,
+    .quran-display {
+        padding: var(--spacing-md);
+    }
+}
+
+/* ==========================================
+   Accessibility
+   ========================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
+/* Focus visible for keyboard navigation */
+*:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+/* ==========================================
+   Tajweed Rules Styling (Accurate Colors)
+   Based on common Tajwīd Mushaf palette
+   ========================================== */
+
+/* 🟢 Ghunnah & Nasalization */
+rule.ghunnah,
+rule.idgham_ghunnah {
+    color: #00B36B; /* Bright Green - nasal sound */
+}
+
+/* 🔵 Qalqalah - Echoing letters (ق ط ب ج د) */
+rule.qalaqah {
+    color: #1E90FF; /* Dodger Blue */
+}
+
+/* 🟦 Idgham without Ghunnah - merging without nasalization */
+rule.idgham_wo_ghunnah {
+    color: #0097A7; /* Teal */
+}
+
+/* 🟢 Idgham Mutajanisayn - merging of similar letters */
+rule.idgham_mutajanisayn {
+    color: #26C6DA; /* Aqua Blue-Green */
+}
+
+/* 🟢 Idgham Mutaqaribayn - merging of close letters */
+rule.idgham_mutaqaribayn {
+    color: #00BCD4; /* Cyan */
+}
+
+/* 🟩 Ikhfa (Hidden sound) & Ikhfa Shafawi (labial concealment) */
+rule.ikhafa,
+rule.ikhafa_shafawi {
+    color: #7CCB7E; /* Light Green */
+}
+
+/* 🫒 Iqlab - Noon turning into Meem before Ba */
+rule.iqlab {
+    color: #7AA65C; /* Olive Green */
+}
+
+/* 🔴 Madd (Elongation / Prolongation) */
+
+/* Normal Madd (Ṭabīʿī) */
+rule.madda_normal {
+    color: #FF6347; /* Tomato Red */
+}
+
+/* Permissible Madd (Jāʾiz) */
+rule.madda_permissible {
+    color: #E53935; /* Bright Red / Vermilion */
+}
+
+/* Necessary Madd (Lāzim) */
+rule.madda_necessary {
+    color: #B71C1C; /* Dark Red */
+}
+
+/* Obligatory Madd (Muttasil) - connected */
+rule.madda_obligatory_mottasel {
+    color: #8B0000; /* Deep Blood Red */
+}
+
+/* Obligatory Madd (Munfasil) - separated */
+rule.madda_obligatory_monfasel {
+    color: #A40000; /* Crimson */
+}
+
+/* ⚪ Hamzat al-Wasl (Connecting Hamzah) */
+rule.ham_wasl {
+    /* color: #BDBDBD; Light Grey / Muted */
+    color: #9E9E9E; /* Medium Grey (silent Lām) */
+}
+
+/* ⚪ Lam Shamsiyyah - Sun letter assimilation */
+rule.laam_shamsiyah {
+    color: #9E9E9E; /* Medium Grey (silent Lām) */
+}
+
+/* 🟢 Idgham Shafawi - Labial merging */
+rule.idgham_shafawi {
+    color: #4CAF50; /* Medium Green */
+}
+
+/* ⚪ Silent letters (SLNT) - Not pronounced */
+rule.slnt {
+    /* color: #D6D6D6; Very Light Grey */
+    color: #9E9E9E; /* Medium Grey (silent Lām) */
+    opacity: 0.7;
+}
+
+/* Shared rule styling */
+rule {
+    display: inline;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+}
