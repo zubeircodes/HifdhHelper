@@ -10,6 +10,13 @@
     font-display: swap;
 }
 
+@font-face {
+    font-family: 'hafs';
+    src: url('/fonts/hafs.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+}
+
 /* ==========================================
    Global Styles & Reset
    ========================================== */
@@ -697,8 +704,20 @@ rule {
         /* Override to Noto Naskh on mobile */
         --font-arabic: 'Noto Naskh Arabic', 'Uthmanic Hafs', serif;
     }
-    
+
     .verse {
         font-weight: 500; /* Medium weight for Noto Naskh */
     }
+}
+
+/* ==========================================
+   Mobile Class-Specific Font Override
+   ========================================== */
+
+.mobile .quranText {
+    font-family: 'hafs';
+}
+
+.mobile .page-header.rtl {
+    font-family: 'hafs';
 }
