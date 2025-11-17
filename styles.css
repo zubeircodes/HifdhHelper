@@ -695,20 +695,6 @@ rule {
     font-weight: inherit;
 }
 
-/* ==========================================
-   Mobile Font Override
-   ========================================== */
-
-@media (max-width: 768px) {
-    :root {
-        /* Override to Noto Naskh on mobile */
-        --font-arabic: 'Noto Naskh Arabic', 'Uthmanic Hafs', serif;
-    }
-
-    .verse {
-        font-weight: 500; /* Medium weight for Noto Naskh */
-    }
-}
 
 /* ==========================================
    Mobile Class-Specific Font Override
