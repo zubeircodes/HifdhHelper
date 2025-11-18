@@ -6,7 +6,7 @@
 // Constants and Configuration
 // ==========================================
 
-const QURAN_JSON_PATH = 'qpc-hafs-tajweed.json';
+let QURAN_JSON_PATH = 'text/qpc-hafs-tajweed.json'; // Default text source (can be changed by user)
 const EVERYAYAH_BASE = 'https://everyayah.com/data';
 
 // Available reciters on EveryAyah.com
@@ -18,6 +18,34 @@ const RECITERS = {
 
 // Cache for Quran text
 let quranData = null;
+
+// ==========================================
+// Browser Detection
+// ==========================================
+
+function isSafariOrChromeIOS() {
+    const userAgent = navigator.userAgent;
+    const isIOS = /iPhone|iPad|iPod/.test(userAgent);
+    const isSafari = /Safari/.test(userAgent) && !/Chrome/.test(userAgent);
+    const isChrome = /CriOS/.test(userAgent); // Chrome on iOS uses CriOS identifier
+
+    // Safari on any platform or Chrome on iOS
+    return isSafari || (isIOS && isChrome);
+}
+
+function getOptimalTextAndFont() {
+    if (isSafariOrChromeIOS()) {
+        return {
+            textSource: 'text/digital-khatt-v2Text.json',
+            font: 'Digital Khatt'
+        };
+    } else {
+        return {
+            textSource: 'text/qpc-hafs-tajweed.json',
+            font: 'Uthmanic Hafs'
+        };
+    }
+}
 
 // Surah data: name and verse count
 const SURAHS = [
@@ -168,6 +196,7 @@ const elements = {
     decreaseRepeat: document.getElementById('repeat-decrease'),
     increaseRepeat: document.getElementById('repeat-increase'),
     reciterSelect: document.getElementById('reciter-select'),
+    // fontSelect and textSelect removed - auto-selected based on browser
     loadLesson: document.getElementById('load-lesson'),
     playPause: document.getElementById('play-pause'),
     playIcon: document.getElementById('play-icon'),
@@ -185,6 +214,20 @@ function init() {
     populateSurahSelectors();
     attachEventListeners();
     updateVerseSelectors();
+    applyOptimalTextAndFont();
+}
+
+function applyOptimalTextAndFont() {
+    // Automatically select optimal text source and font based on browser
+    const optimal = getOptimalTextAndFont();
+
+    console.log('Browser detected - Using:', optimal);
+
+    // Set the text source
+    QURAN_JSON_PATH = optimal.textSource;
+
+    // Apply the font
+    applyFont(optimal.font);
 }
 
 function populateSurahSelectors() {
@@ -297,6 +340,7 @@ function attachEventListeners() {
     });
 
     elements.reciterSelect.addEventListener('change', handleReciterChange);
+    // Font and text are now auto-selected based on browser - no manual selection needed
 
     elements.loadLesson.addEventListener('click', loadLesson);
     elements.playPause.addEventListener('click', togglePlayPause);
@@ -313,6 +357,71 @@ function handleReciterChange() {
             verse.audioUrl = getAudioUrl(verse.surah, verse.verse);
         });
         console.log('Audio URLs updated for new reciter');
+    }
+}
+
+function handleFontChange() {
+    const selectedFont = elements.fontSelect.value;
+    console.log('Font changed to:', selectedFont);
+
+    // Apply the font to all verse elements and the header
+    applyFont(selectedFont);
+
+    // Save the font preference to localStorage
+    localStorage.setItem('selectedFont', selectedFont);
+}
+
+function handleTextChange() {
+    const selectedText = elements.textSelect.value;
+    console.log('Text source changed to:', selectedText);
+
+    // Update the text source path
+    QURAN_JSON_PATH = selectedText;
+
+    // Clear the cached quran data so it reloads
+    quranData = null;
+
+    // Save the text preference to localStorage
+    localStorage.setItem('selectedText', selectedText);
+
+    // If a lesson is currently loaded, reload it with the new text
+    if (state.verses.length > 0) {
+        console.log('Reloading lesson with new text source...');
+        loadLesson();
+    }
+}
+
+function applyFont(fontFamily) {
+    // Enhanced font stack with proper Arabic fallbacks for iOS Safari
+    const fontStack = `'${fontFamily}', 'Noto Naskh Arabic', 'Traditional Arabic', 'Arabic Typesetting', 'Geeza Pro', serif`;
+
+    // Update CSS variable for Arabic font
+    document.documentElement.style.setProperty('--font-arabic', fontStack);
+
+    // Get verses container
+    const versesContainer = document.getElementById('verses-container');
+
+    // For Noto Naskh Arabic, add 'plain-text' class to disable tajweed colors
+    if (fontFamily === 'Noto Naskh Arabic') {
+        if (versesContainer) {
+            versesContainer.classList.add('plain-text');
+        }
+    } else {
+        // Remove plain-text class for all other fonts to show tajweed colors
+        if (versesContainer) {
+            versesContainer.classList.remove('plain-text');
+        }
+    }
+
+    // Apply font to verses container
+    if (versesContainer) {
+        versesContainer.style.fontFamily = fontStack;
+    }
+
+    // Apply to header
+    const header = document.querySelector('.app-header h1');
+    if (header) {
+        header.style.fontFamily = fontStack;
     }
 }
 
@@ -417,25 +526,76 @@ async function loadQuranData() {
     }
 }
 
+function detectDataFormat(data) {
+    // Check the first key to determine the format
+    const firstKey = Object.keys(data)[0];
+
+    // Word-by-word format has keys like "1:1:1" (surah:ayah:word)
+    // Verse format has keys like "1:1" (surah:ayah)
+    const parts = firstKey.split(':');
+
+    if (parts.length === 3) {
+        return 'word-by-word'; // Digital Khatt format
+    } else {
+        return 'verse'; // QPC Hafs format
+    }
+}
+
+function getVerseText(data, surah, verse, format) {
+    if (format === 'verse') {
+        // Direct verse lookup (QPC Hafs format)
+        const verseKey = `${surah}:${verse}`;
+        const verseData = data[verseKey];
+        return verseData ? verseData.text : null;
+    } else {
+        // Word-by-word format (Digital Khatt format)
+        // Collect all words for this verse and combine them
+        const words = [];
+        let wordIndex = 1;
+
+        while (true) {
+            const wordKey = `${surah}:${verse}:${wordIndex}`;
+            const wordData = data[wordKey];
+
+            if (!wordData) {
+                break; // No more words for this verse
+            }
+
+            words.push(wordData.text);
+            wordIndex++;
+        }
+
+        if (words.length === 0) {
+            return null; // Verse not found
+        }
+
+        // Join words with space
+        return words.join(' ');
+    }
+}
+
 async function fetchVerses(verseRange) {
     const verses = [];
 
     // Load Quran data from local JSON file
     const data = await loadQuranData();
 
+    // Detect the data format
+    const format = detectDataFormat(data);
+    console.log('Detected Quran data format:', format);
+
     for (const { surah, verse } of verseRange) {
         try {
-            const verseKey = `${surah}:${verse}`;
-            const verseData = data[verseKey];
+            const text = getVerseText(data, surah, verse, format);
 
-            if (!verseData) {
-                throw new Error(`Verse ${verseKey} not found`);
+            if (!text) {
+                throw new Error(`Verse ${surah}:${verse} not found`);
             }
 
             verses.push({
                 surah,
                 verse,
-                text: verseData.text,
+                text: text,
                 audioUrl: getAudioUrl(surah, verse)
             });
 

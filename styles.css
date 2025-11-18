@@ -1,28 +1,68 @@
 /* ==========================================
-   Font Loading - Uthmanic Hafs v22
+   Font Loading - All Arabic Fonts (iOS-Compatible)
    ========================================== */
 
+/* Uthmanic Hafs v22 */
 @font-face {
     font-family: 'Uthmanic Hafs';
     src: url('fonts/UthmanicHafs_V22.woff2') format('woff2');
-    font-weight: normal;
+    font-weight: 400;
     font-style: normal;
     font-display: swap;
+    unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF;
 }
 
+/* Hafs Font */
 @font-face {
-    font-family: 'hafs';
-    src: url('/fonts/scheherazade.woff2') format('woff2');
-    font-weight: normal;
+    font-family: 'Hafs';
+    src: url('fonts/hafs.woff2') format('woff2');
+    font-weight: 400;
     font-style: normal;
+    font-display: swap;
+    unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF;
 }
 
-/* @font-face {
-    font-family: 'hafs';
-    src: url('/fonts/hafs.woff2') format('woff2');
-    font-weight: normal;
+/* Scheherazade Font */
+@font-face {
+    font-family: 'Scheherazade';
+    src: url('fonts/scheherazade.woff2') format('woff2');
+    font-weight: 400;
     font-style: normal;
-} */
+    font-display: swap;
+    unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF;
+}
+
+/* Indopak Font */
+@font-face {
+    font-family: 'Indopak';
+    src: url('fonts/font.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+    unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF;
+}
+
+/* Digital Khatt v2 Font */
+@font-face {
+    font-family: 'Digital Khatt';
+    src: url('fonts/DigitalKhattV2.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+    unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF;
+}
+
+/* Kitab Base Font */
+@font-face {
+    font-family: 'Kitab Base';
+    src: url('fonts/kitab-base.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+    unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF;
+}
+
+/* Noto Naskh Arabic is loaded from Google Fonts in index.html */
 
 /* ==========================================
    Global Styles & Reset
@@ -48,8 +88,8 @@
     --border-color: #dfe6e9;
     --shadow: rgba(0, 0, 0, 0.1);
 
-    /* Typography */
-    --font-arabic: 'Uthmanic Hafs', 'Traditional Arabic', serif;
+    /* Typography - Enhanced fallback stack for iOS Safari */
+    --font-arabic: 'Uthmanic Hafs', 'Noto Naskh Arabic', 'Traditional Arabic', 'Arabic Typesetting', 'Geeza Pro', serif;
     --font-latin: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
     /* Spacing */
@@ -456,6 +496,14 @@ input[type="number"] {
     border-radius: var(--radius-sm);
     transition: all 0.3s ease;
     cursor: pointer;
+
+    /* Enhanced Arabic rendering - Critical for iOS Safari */
+    font-feature-settings: "liga" 1, "rlig" 1, "calt" 1, "kern" 1;
+    text-rendering: optimizeLegibility;
+    unicode-bidi: isolate;
+    direction: rtl;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 .verse:hover {
@@ -702,15 +750,75 @@ rule {
     font-weight: inherit;
 }
 
-
 /* ==========================================
-   Mobile Class-Specific Font Override
+   Plain Text Mode (for Noto Naskh Arabic)
    ========================================== */
 
-.mobile .quranText {
-    font-family: 'hafs';
+/* Remove all tajweed colors when using Noto Naskh - display plain black text */
+.plain-text rule.ghunnah,
+.plain-text rule.idgham_ghunnah,
+.plain-text rule.qalaqah,
+.plain-text rule.idgham_wo_ghunnah,
+.plain-text rule.idgham_mutajanisayn,
+.plain-text rule.idgham_mutaqaribayn,
+.plain-text rule.ikhafa,
+.plain-text rule.ikhafa_shafawi,
+.plain-text rule.iqlab,
+.plain-text rule.madda_normal,
+.plain-text rule.madda_permissible,
+.plain-text rule.madda_necessary,
+.plain-text rule.madda_obligatory_mottasel,
+.plain-text rule.madda_obligatory_monfasel,
+.plain-text rule.ham_wasl,
+.plain-text rule.laam_shamsiyah,
+.plain-text rule.idgham_shafawi,
+.plain-text rule.slnt {
+    color: inherit !important;
+    opacity: 1 !important;
 }
 
-.mobile .page-header.rtl {
-    font-family: 'hafs';
+
+/* ==========================================
+   Font & Text Selector Styles
+   ========================================== */
+
+.font-control,
+.text-control {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.font-control label,
+.text-control label {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.font-select,
+.text-select {
+    padding: 12px 16px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 1rem;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.font-select:focus,
+.text-select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(26, 71, 42, 0.1), 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.font-select:hover,
+.text-select:hover {
+    border-color: var(--primary-light);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
