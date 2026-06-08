@@ -9,6 +9,7 @@ const tabs = [
   { label: "Classes", href: "/instructor/classes" },
   { label: "Assign", href: "/instructor/assignments" },
   { label: "Evaluate", href: "/instructor/evaluate" },
+  { label: "Settings", href: "/instructor/categories" },
 ];
 
 export function InstructorMobileHeader() {
