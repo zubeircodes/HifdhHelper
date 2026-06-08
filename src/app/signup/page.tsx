@@ -25,8 +25,8 @@ const roles = [
     id: "parent",
     title: "Parent",
     body: "My child is memorizing — I'd like to follow along.",
-    footer: "We'll link you to your child's account.",
-    disabled: false,
+    footer: "Coming soon.",
+    disabled: true,
   },
   {
     id: "admin",
