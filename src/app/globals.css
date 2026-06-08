@@ -1,0 +1,682 @@
+@import "tailwindcss";
+
+/* ==========================================
+   Arabic Font Loading (local woff2 files)
+   ========================================== */
+
+@font-face {
+  font-family: 'Uthmanic Hafs';
+  src: url('/fonts/UthmanicHafs_V22.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF;
+}
+
+@font-face {
+  font-family: 'Digital Khatt';
+  src: url('/fonts/DigitalKhattV2.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF;
+}
+
+@font-face {
+  font-family: 'Scheherazade';
+  src: url('/fonts/scheherazade.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF;
+}
+
+/* ==========================================
+   Hifdh Helper — Design Tokens
+   Paper & sage palette. Type-led. Editorial whitespace.
+   ========================================== */
+
+:root {
+  /* Paper backgrounds — warm cream, never pure white */
+  --paper-0: #f6f1e8;
+  --paper-1: #fbf7ef;
+  --paper-2: #ffffff;
+  --paper-3: #efe9dc;
+  --paper-4: #e6dfce;
+
+  /* Ink — warm dark brown-black */
+  --ink-0: #1f1c14;
+  --ink-1: #4a463a;
+  --ink-2: #7a7565;
+  --ink-3: #a8a294;
+  --ink-4: #cac2af;
+
+  /* Hairlines (use instead of borders) */
+  --rule-1: rgba(31, 28, 20, 0.07);
+  --rule-2: rgba(31, 28, 20, 0.14);
+  --rule-3: rgba(31, 28, 20, 0.24);
+
+  /* Sage accent — herbal, never green-green */
+  --sage-h: 142;
+  --sage-c: 0.04;
+  --sage: oklch(0.46 var(--sage-c) var(--sage-h));
+  --sage-deep: oklch(0.32 var(--sage-c) var(--sage-h));
+  --sage-soft: oklch(0.78 var(--sage-c) var(--sage-h));
+  --sage-wash: oklch(0.93 var(--sage-c) var(--sage-h));
+  --sage-fg: #fbf7ef;
+
+  /* Status — earthy, not saturated */
+  --pass: oklch(0.48 0.06 145);
+  --partial: oklch(0.62 0.09 70);
+  --fail: oklch(0.52 0.10 28);
+
+  /* Tajweed — softened Madinah-mushaf */
+  --tj-ghunnah: #b08840;
+  --tj-ikhfa: #8a5e8e;
+  --tj-idgham: #4f7295;
+  --tj-iqlab: #6b803e;
+  --tj-qalqalah: #2f7e7e;
+  --tj-madda-2: #6e6a5c;
+  --tj-madda-4: #b85a37;
+  --tj-madda-6: #a83b30;
+  --tj-silent: #b3ad9d;
+
+  /* Type stacks */
+  --font-serif: "Newsreader", "Georgia", "Iowan Old Style", serif;
+  --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-arabic: "Uthmanic Hafs", "Scheherazade", "Amiri Quran", "Traditional Arabic", "Geeza Pro", serif;
+
+  /* Spacing scale */
+  --space-xs: 6px;
+  --space-sm: 10px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 36px;
+  --space-2xl: 56px;
+
+  /* Radii — small, mostly squared */
+  --r-sm: 4px;
+  --r-md: 8px;
+  --r-lg: 12px;
+}
+
+/* Compact density mode */
+[data-density="compact"] {
+  --space-md: 11px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 36px;
+}
+
+/* ==========================================
+   Base Reset
+   ========================================== */
+
+body {
+  font-family: var(--font-sans);
+  color: var(--ink-0);
+  background: var(--paper-0);
+  font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: -0.005em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ==========================================
+   Typography Utilities
+   ========================================== */
+
+.hh-serif {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  letter-spacing: -0.012em;
+}
+
+.hh-display {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  letter-spacing: -0.022em;
+  line-height: 1.05;
+}
+
+.hh-eyebrow {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-2);
+  font-weight: 500;
+}
+
+.hh-meta {
+  color: var(--ink-2);
+  font-size: 11.5px;
+}
+
+.hh-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================
+   Atomic Styles
+   ========================================== */
+
+/* Hairline rule */
+.hh-rule {
+  height: 1px;
+  background: var(--rule-1);
+  border: 0;
+}
+
+/* Buttons */
+.hh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--rule-2);
+  background: var(--paper-2);
+  color: var(--ink-0);
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.hh-btn:hover {
+  background: var(--paper-3);
+}
+.hh-btn.primary {
+  background: var(--ink-0);
+  color: var(--paper-1);
+  border-color: var(--ink-0);
+}
+.hh-btn.primary:hover {
+  background: #2c2718;
+}
+.hh-btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-1);
+  padding: 6px 10px;
+}
+.hh-btn.ghost:hover {
+  background: var(--paper-3);
+}
+.hh-btn.sage {
+  background: var(--sage-deep);
+  color: var(--sage-fg);
+  border-color: transparent;
+}
+.hh-btn.sage:hover {
+  background: var(--sage);
+}
+.hh-btn.sm {
+  padding: 5px 10px;
+  font-size: 11.5px;
+}
+.hh-btn.lg {
+  padding: 12px 22px;
+  font-size: 14px;
+}
+
+/* Inputs */
+.hh-input {
+  width: 100%;
+  padding: 9px 12px;
+  background: var(--paper-2);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-md);
+  color: var(--ink-0);
+  font-size: 13px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.12s;
+}
+.hh-input:focus {
+  border-color: var(--ink-1);
+}
+.hh-input::placeholder {
+  color: var(--ink-3);
+}
+
+/* Status — text + colored dot */
+.hh-status {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  font-weight: 500;
+}
+.hh-status::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 3px;
+  align-self: center;
+}
+.hh-status.pass {
+  color: var(--pass);
+}
+.hh-status.pass::before {
+  background: var(--pass);
+}
+.hh-status.partial {
+  color: var(--partial);
+}
+.hh-status.partial::before {
+  background: var(--partial);
+}
+.hh-status.fail {
+  color: var(--fail);
+}
+.hh-status.fail::before {
+  background: var(--fail);
+}
+.hh-status.muted {
+  color: var(--ink-2);
+}
+.hh-status.muted::before {
+  background: var(--ink-3);
+}
+
+/* Arabic text — matches the old app's .verse exactly */
+.hh-arabic {
+  font-family: var(--font-arabic);
+  font-size: 2.5rem;
+  line-height: 3.2;
+  direction: rtl;
+  text-align: right;
+  font-weight: 400;
+  color: var(--ink-0);
+
+  /* Critical for Arabic ligatures and connected script */
+  font-feature-settings: "liga" 1, "rlig" 1, "calt" 1, "kern" 1;
+  text-rendering: optimizeLegibility;
+  unicode-bidi: isolate;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@media (max-width: 768px) {
+  .hh-arabic {
+    font-size: 1.5rem;
+    line-height: 2.2;
+  }
+}
+
+/* Overline — label + extending hairline */
+.hh-overline {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  font-weight: 500;
+}
+.hh-overline::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--rule-1);
+  align-self: center;
+}
+
+/* Desktop nav rail item */
+.hh-rail {
+  font-size: 13px;
+  color: var(--ink-1);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hh-rail:hover {
+  background: var(--paper-3);
+  color: var(--ink-0);
+}
+.hh-rail.active {
+  color: var(--ink-0);
+  font-weight: 500;
+  background: transparent;
+}
+.hh-rail.active::before {
+  content: "";
+  width: 4px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--sage-deep);
+}
+
+/* Mobile tab bar */
+.hh-tab {
+  flex: 1;
+  padding: 14px 0 6px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--ink-3);
+  letter-spacing: 0.04em;
+  font-weight: 500;
+  position: relative;
+}
+.hh-tab.active {
+  color: var(--ink-0);
+}
+.hh-tab.active::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 12px;
+  height: 1.5px;
+  background: var(--ink-0);
+  border-radius: 1px;
+}
+
+/* ==========================================
+   Tajweed <rule> tag styling
+   From the Quran JSON — rendered as inline HTML
+   ========================================== */
+
+rule {
+  display: inline;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+rule.ghunnah,
+rule.idgham_ghunnah        { color: var(--tj-ghunnah); }
+rule.qalaqah               { color: var(--tj-qalqalah); }
+rule.idgham_wo_ghunnah     { color: var(--tj-idgham); }
+rule.idgham_mutajanisayn   { color: var(--tj-idgham); }
+rule.idgham_mutaqaribayn   { color: var(--tj-idgham); }
+rule.ikhafa,
+rule.ikhafa_shafawi        { color: var(--tj-ikhfa); }
+rule.iqlab                 { color: var(--tj-iqlab); }
+rule.idgham_shafawi        { color: var(--tj-idgham); }
+rule.madda_normal          { color: var(--tj-madda-2); }
+rule.madda_permissible     { color: var(--tj-madda-4); }
+rule.madda_necessary       { color: var(--tj-madda-6); }
+rule.madda_obligatory_mottasel { color: var(--tj-madda-6); }
+rule.madda_obligatory_monfasel { color: var(--tj-madda-4); }
+rule.ham_wasl              { color: var(--tj-silent); }
+rule.laam_shamsiyah        { color: var(--tj-silent); }
+rule.slnt                  { color: var(--tj-silent); opacity: 0.7; }
+
+/* Focus */
+:focus-visible {
+  outline: 1.5px solid var(--ink-1);
+  outline-offset: 2px;
+}
+
+/* ==========================================
+   Page Layouts — responsive
+   ========================================== */
+
+/* Split layout: side-by-side on desktop, stacked on mobile */
+.hh-split {
+  width: 100%;
+  min-height: 100vh;
+  background: var(--paper-1);
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+}
+.hh-split--even {
+  grid-template-columns: 1fr 1fr;
+}
+.hh-split__main {
+  padding: 44px 56px 40px;
+  display: flex;
+  flex-direction: column;
+}
+.hh-split__aside {
+  background: var(--paper-3);
+  padding: 44px 48px;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--rule-1);
+  justify-content: center;
+}
+
+/* Landing hero */
+.hh-hero-title {
+  font-size: 56px;
+  margin: 18px 0 22px;
+  color: var(--ink-0);
+}
+
+/* Landing nav (hide secondary links on mobile) */
+.hh-landing-nav-links {
+  display: flex;
+  gap: 20;
+  font-size: 12px;
+  color: var(--ink-1);
+  white-space: nowrap;
+}
+.hh-landing-nav-secondary {
+  display: inline;
+}
+
+/* Landing stats */
+.hh-landing-stats {
+  margin-top: 56px;
+  display: flex;
+  gap: 36px;
+  color: var(--ink-2);
+  font-size: 11.5px;
+}
+
+/* Signup role grid */
+.hh-role-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--rule-1);
+  border: 1px solid var(--rule-1);
+  max-width: 660px;
+}
+
+/* Page padding — standard comfortable padding */
+.hh-page-padding {
+  padding: 44px 56px;
+}
+
+/* Signup page */
+.hh-signup-page {
+  padding: 44px 64px;
+}
+
+/* Role card hover */
+.hh-role-card:hover {
+  background: var(--paper-3) !important;
+}
+.hh-role-card.disabled:hover {
+  background: var(--paper-1) !important;
+}
+
+/* Auth form title */
+.hh-auth-title {
+  font-size: 34px;
+}
+
+/* Verse aside Arabic */
+.hh-verse-hero {
+  font-size: 44px;
+}
+
+/* Desktop chrome shell */
+.hh-desktop-chrome {
+  width: 100%;
+  min-height: 100vh;
+  background: var(--paper-1);
+  display: flex;
+  overflow: hidden;
+}
+.hh-desktop-rail {
+  flex: 0 0 200px;
+  padding: 28px 18px;
+  border-right: 1px solid var(--rule-1);
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  background: var(--paper-1);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+.hh-desktop-main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.hh-desktop-top {
+  flex: 0 0 auto;
+  padding: 22px 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--rule-1);
+  position: sticky;
+  top: 0;
+  background: var(--paper-1);
+  z-index: 10;
+}
+
+/* Mobile-only header + nav (hidden on desktop where rail is visible) */
+.hh-mobile-header {
+  display: none;
+  padding: 12px 22px;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--rule-1);
+}
+.hh-mobile-nav {
+  display: none;
+  border-bottom: 1px solid var(--rule-1);
+  padding: 0 8px;
+  background: var(--paper-1);
+}
+
+/* Evaluate panel — 2-column on desktop */
+.hh-evaluate-layout {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  min-height: calc(100vh - 70px);
+}
+.hh-evaluate-mushaf {
+  padding: 40px 48px 56px;
+  border-right: 1px solid var(--rule-1);
+  overflow: auto;
+}
+.hh-evaluate-form {
+  padding: 40px 32px 48px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+/* Instructor stats row */
+.hh-instructor-stats {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .hh-split,
+  .hh-split--even {
+    grid-template-columns: 1fr;
+  }
+
+  .hh-split__main {
+    padding: 28px 22px 32px;
+  }
+
+  .hh-split__aside {
+    border-left: none;
+    border-top: 1px solid var(--rule-1);
+    padding: 32px 22px;
+  }
+
+  .hh-hero-title {
+    font-size: 36px;
+    margin: 14px 0 18px;
+  }
+
+  .hh-landing-nav-secondary {
+    display: none;
+  }
+
+  .hh-landing-stats {
+    margin-top: 36px;
+    flex-wrap: wrap;
+    gap: 16px 28px;
+  }
+
+  .hh-role-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hh-auth-title {
+    font-size: 28px;
+  }
+
+  .hh-verse-hero {
+    font-size: 30px;
+  }
+
+  .hh-page-padding {
+    padding: 28px 22px;
+  }
+
+  .hh-signup-page {
+    padding: 28px 22px;
+  }
+
+  .hh-desktop-rail {
+    display: none;
+  }
+  .hh-mobile-header {
+    display: flex;
+  }
+  .hh-mobile-nav {
+    display: flex;
+  }
+  .hh-desktop-top {
+    padding: 16px 22px;
+  }
+
+  .hh-evaluate-layout {
+    grid-template-columns: 1fr;
+  }
+  .hh-evaluate-mushaf {
+    padding: 24px 22px 32px;
+    border-right: none;
+    border-bottom: 1px solid var(--rule-1);
+  }
+  .hh-evaluate-form {
+    padding: 24px 22px 32px;
+  }
+
+  .hh-instructor-stats {
+    gap: 20px 36px;
+  }
+
+  .hh-btn.lg {
+    padding: 14px 22px;
+    width: 100%;
+    justify-content: center;
+  }
+}
