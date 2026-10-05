@@ -5,18 +5,12 @@ import { Eyebrow, IcoBack, IcoCheck, Avatar, VerseText } from "@/components/atom
 import { SURAHS, getSurah } from "@/lib/quran-meta";
 import { getVerseRange } from "@/lib/quran-text";
 import { createClient } from "@/lib/supabase";
+import { RECITERS, DEFAULT_RECITER } from "@/lib/audio";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 interface LessonType { id: string; name: string; description: string | null; }
 interface StudentSlot { id: string; student_name: string; halaqa_id: string; claimed_by: string | null; }
-interface Reciter { id: string; name: string; }
-
-const RECITERS: Reciter[] = [
-  { id: "Alafasy_64kbps", name: "Mishary Alafasy" },
-  { id: "Husary_64kbps", name: "Mahmoud Al-Hussary" },
-  { id: "Minshawy_Murattal_128kbps", name: "Mohamed Al-Minshawy" },
-];
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -46,7 +40,7 @@ export default function NewAssignment() {
   const [endSurahNum, setEndSurahNum] = useState(1);
   const [startVerse, setStartVerse] = useState("1");
   const [endVerse, setEndVerse] = useState("7");
-  const [reciter, setReciter] = useState("Alafasy_64kbps");
+  const [reciter, setReciter] = useState(DEFAULT_RECITER);
   const [repeat, setRepeat] = useState(5);
   const [selected, setSelected] = useState<string[]>([]);
   const [previewHtml, setPreviewHtml] = useState("");
