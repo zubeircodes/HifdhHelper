@@ -4,7 +4,7 @@ A calm, type-led web app that joins instructors, students, and families around t
 
 ## Stack
 
-- **Frontend:** Next.js 15, React, TypeScript, Tailwind CSS
+- **Frontend:** Next.js 16, React 19, TypeScript, Tailwind CSS
 - **Backend:** Supabase (Postgres, Auth, RLS, RPC functions)
 - **Fonts:** Plus Jakarta Sans, Newsreader, Amiri Quran, JetBrains Mono
 
@@ -24,6 +24,7 @@ src/
   components/
     atoms/              # Wordmark, Avatar, VerseMark, Word, Streak, Status, etc.
     shells/             # MobileShell, DesktopChrome layout frames
+    practice/           # PracticePlayer — free listen-and-repeat tool (landing + student tab)
   lib/                  # Supabase client utilities
 supabase/
   migrations/           # SQL migrations (schema, RLS, RPC functions)
