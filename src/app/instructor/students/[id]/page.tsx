@@ -129,7 +129,12 @@ export default function InstructorStudentPage({ params }: { params: Promise<{ id
                 <span className="hh-num" style={{ fontSize: 11.5, color: "var(--ink-2)", width: 96, flexShrink: 0 }}>{formatDate(a.date)}</span>
                 <span style={{ fontSize: 11, color: "var(--ink-2)", width: 90, flexShrink: 0, textTransform: "uppercase", letterSpacing: "0.04em" }}>{it.lesson_type_name}</span>
                 <span className="hh-serif" style={{ fontSize: 14, flex: 1 }}>{itemLabel(it)}</span>
-                <Status kind="muted">Grade</Status>
+                {student.claimed_by && (
+                  <span className="hh-num" style={{ fontSize: 11, color: "var(--ink-2)" }}>
+                    {Math.min(it.listens, it.repetitions)}/{it.repetitions}
+                  </span>
+                )}
+                <Status kind={it.submitted_at ? "pass" : "muted"}>{it.submitted_at ? "Ready" : "Grade"}</Status>
               </Link>
             ))}
           </div>

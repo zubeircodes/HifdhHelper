@@ -26,6 +26,8 @@ interface Item {
   end_surah: number;
   end_ayah: number;
   repetitions: number;
+  listens: number;
+  submitted_at: string | null;
   assignment_id: string;
   date: string;
   lesson_type_name: string;
@@ -58,7 +60,7 @@ export default function EvaluateLesson({ params }: { params: Promise<{ id: strin
 
       const { data: row } = await supabase
         .from("assignment_items")
-        .select("id, surah, start_ayah, end_surah, end_ayah, repetitions, assignment_id, assignments(date), lesson_types(name), evaluations(result, note)")
+        .select("id, surah, start_ayah, end_surah, end_ayah, repetitions, assignment_id, assignments(date), lesson_types(name), listen_progress(listens_completed), submissions(submitted_at), evaluations(result, note)")
         .eq("id", lessonId)
         .single();
 
@@ -75,6 +77,8 @@ export default function EvaluateLesson({ params }: { params: Promise<{ id: strin
         end_surah: r.end_surah ?? r.surah,
         end_ayah: r.end_ayah,
         repetitions: r.repetitions,
+        listens: one(r.listen_progress)?.listens_completed ?? 0,
+        submitted_at: one(r.submissions)?.submitted_at ?? null,
         assignment_id: r.assignment_id,
         date: one(r.assignments)?.date ?? "",
         lesson_type_name: one(r.lesson_types)?.name ?? "Lesson",
@@ -172,7 +176,8 @@ export default function EvaluateLesson({ params }: { params: Promise<{ id: strin
             {label}
           </h1>
           <div style={{ fontSize: 12.5, color: "var(--ink-2)", marginBottom: 32 }}>
-            {studentName}
+            {studentName} · listened {Math.min(item.listens, item.repetitions)} of {item.repetitions}
+            {item.submitted_at ? " · marked ready" : ""}
           </div>
 
           <div style={{ background: "var(--paper-2)", border: "1px solid var(--rule-1)", padding: "24px 28px" }}>

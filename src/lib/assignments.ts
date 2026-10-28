@@ -23,6 +23,9 @@ export interface AssignmentItem {
   end_ayah: number;
   reciter_ref: string | null;
   repetitions: number;
+  listens: number;
+  last_listened_at: string | null;
+  submitted_at: string | null;
   evaluation: Evaluation | null;
 }
 
@@ -32,8 +35,10 @@ export interface Assignment {
   items: AssignmentItem[];
 }
 
-const ITEM_SELECT =
-  "id, date, assignment_items(id, lesson_type_id, surah, start_ayah, end_surah, end_ayah, reciter_ref, repetitions, lesson_types(name), evaluations(result, note, evaluated_at))";
+export const ITEM_FIELDS =
+  "id, lesson_type_id, surah, start_ayah, end_surah, end_ayah, reciter_ref, repetitions, lesson_types(name), listen_progress(listens_completed, last_listened_at), submissions(submitted_at), evaluations(result, note, evaluated_at)";
+
+const ITEM_SELECT = `id, date, assignment_items(${ITEM_FIELDS})`;
 
 // PostgREST returns a to-one relation as an object, but some setups return a
 // one-element array. Accept either.
@@ -43,8 +48,9 @@ function one<T>(v: T | T[] | null | undefined): T | null {
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-function normalize(row: any): Assignment {
-  const items: AssignmentItem[] = (row.assignment_items || []).map((it: any) => ({
+export function normalizeItem(it: any): AssignmentItem {
+  const lp = one<{ listens_completed: number; last_listened_at: string | null }>(it.listen_progress);
+  return {
     id: it.id,
     lesson_type_id: it.lesson_type_id,
     lesson_type_name: one<{ name: string }>(it.lesson_types)?.name ?? "Lesson",
@@ -54,8 +60,15 @@ function normalize(row: any): Assignment {
     end_ayah: it.end_ayah,
     reciter_ref: it.reciter_ref,
     repetitions: it.repetitions,
+    listens: lp?.listens_completed ?? 0,
+    last_listened_at: lp?.last_listened_at ?? null,
+    submitted_at: one<{ submitted_at: string }>(it.submissions)?.submitted_at ?? null,
     evaluation: one<Evaluation>(it.evaluations),
-  }));
+  };
+}
+
+export function normalizeAssignment(row: any): Assignment {
+  const items: AssignmentItem[] = (row.assignment_items || []).map(normalizeItem);
   // Stable order: by surah then ayah, so Review ranges read in mushaf order.
   items.sort((a, b) => a.surah - b.surah || a.start_ayah - b.start_ayah);
   return { id: row.id, date: row.date, items };
@@ -75,7 +88,31 @@ export async function loadSlotAssignments(
     .order("date", { ascending: false })
     .limit(limit);
   if (error || !data) return [];
-  return data.map(normalize);
+  return data.map(normalizeAssignment);
+}
+
+/** Newest-first assignments for the signed-in student (via their claimed slot
+ *  or student_id). */
+export async function loadMyAssignments(
+  supabase: SupabaseClient,
+  userId: string,
+  limit = 20,
+): Promise<Assignment[]> {
+  const { data, error } = await supabase
+    .from("assignments")
+    .select(ITEM_SELECT)
+    .or(`student_id.eq.${userId},student_slot_id.in.(${await mySlotIds(supabase, userId)})`)
+    .order("date", { ascending: false })
+    .limit(limit);
+  if (error || !data) return [];
+  return data.map(normalizeAssignment);
+}
+
+async function mySlotIds(supabase: SupabaseClient, userId: string): Promise<string> {
+  const { data } = await supabase.from("student_slots").select("id").eq("claimed_by", userId);
+  const ids = (data || []).map((s) => s.id);
+  // PostgREST needs a non-empty list; a nil uuid matches nothing.
+  return (ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]).join(",");
 }
 
 /** The assignment a teacher should be grading: the newest one with an

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Eyebrow, Avatar, Status } from "@/components/atoms";
 import { createClient } from "@/lib/supabase";
-import { formatDate, type Assignment } from "@/lib/assignments";
+import { formatDate, normalizeItem, ITEM_FIELDS, type Assignment } from "@/lib/assignments";
 import Link from "next/link";
 
 interface StudentSlot {
@@ -60,7 +60,7 @@ export default function InstructorDashboard() {
           // latest per slot. Replaces 4 round trips per student.
           const { data: rows } = await supabase
             .from("assignments")
-            .select("id, date, student_slot_id, assignment_items(id, lesson_type_id, surah, start_ayah, end_surah, end_ayah, reciter_ref, repetitions, lesson_types(name), evaluations(result, note, evaluated_at))")
+            .select(`id, date, student_slot_id, assignment_items(${ITEM_FIELDS})`)
             .in("student_slot_id", slots.map((s) => s.id))
             .order("date", { ascending: false })
             .limit(1000);
@@ -69,22 +69,10 @@ export default function InstructorDashboard() {
           /* eslint-disable @typescript-eslint/no-explicit-any */
           for (const r of (rows || []) as any[]) {
             if (latestBySlot.has(r.student_slot_id)) continue;
-            const one = (v: any) => (Array.isArray(v) ? v[0] : v);
             latestBySlot.set(r.student_slot_id, {
               id: r.id,
               date: r.date,
-              items: (r.assignment_items || []).map((it: any) => ({
-                id: it.id,
-                lesson_type_id: it.lesson_type_id,
-                lesson_type_name: one(it.lesson_types)?.name ?? "Lesson",
-                surah: it.surah,
-                start_ayah: it.start_ayah,
-                end_surah: it.end_surah ?? it.surah,
-                end_ayah: it.end_ayah,
-                reciter_ref: it.reciter_ref,
-                repetitions: it.repetitions,
-                evaluation: one(it.evaluations) ?? null,
-              })),
+              items: (r.assignment_items || []).map(normalizeItem),
             });
           }
           /* eslint-enable @typescript-eslint/no-explicit-any */
