@@ -78,10 +78,10 @@ export default function StudentDashboard() {
             Join your teacher&apos;s class to start receiving lessons
           </p>
           <p style={{ fontSize: 12, color: "var(--ink-2)", margin: "0 0 20px" }}>
-            Enter the invite code your teacher gave you.
+            Enter the code your teacher gave you.
           </p>
           <Link href="/student/join" className="hh-btn primary" style={{ textDecoration: "none" }}>
-            Enter invite code
+            Enter class code
           </Link>
         </div>
 

@@ -26,14 +26,12 @@ export default function Dashboard() {
           .limit(1);
 
         if (!halaqat || halaqat.length === 0) {
-          router.replace("/instructor/setup");
+          router.replace("/instructor/classes");
         } else {
           router.replace("/instructor");
         }
       } else if (role === "student") {
         router.replace("/student");
-      } else if (role === "parent") {
-        router.replace("/parent");
       } else {
         router.replace("/student");
       }

@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Suspense } from "react";
 import { Eyebrow, IcoBack, IcoCheck, Avatar, VerseText } from "@/components/atoms";
-import { SURAHS, getSurah } from "@/lib/quran-meta";
+import { SURAHS, getSurah, juzRange, rangeLabel, type AyahRange } from "@/lib/quran-meta";
 import { getVerseRange } from "@/lib/quran-text";
 import { createClient } from "@/lib/supabase";
 import { RECITERS, DEFAULT_RECITER } from "@/lib/audio";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 interface LessonType { id: string; name: string; description: string | null; }
 interface StudentSlot { id: string; student_name: string; halaqa_id: string; claimed_by: string | null; }
@@ -30,19 +30,33 @@ function getInitials(name: string): string {
     : name.slice(0, 2).toUpperCase();
 }
 
-export default function NewAssignment() {
+function todayISO(): string {
+  const d = new Date();
+  const tz = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - tz).toISOString().split("T")[0];
+}
+
+function NewAssignmentForm() {
+  const params = useSearchParams();
+  const router = useRouter();
+  const preselect = params.get("student");
+
   const [categories, setCategories] = useState<LessonType[]>([]);
   const [students, setStudents] = useState<StudentSlot[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [category, setCategory] = useState("");
+  const [date, setDate] = useState(todayISO());
   const [startSurahNum, setStartSurahNum] = useState(1);
   const [endSurahNum, setEndSurahNum] = useState(1);
   const [startVerse, setStartVerse] = useState("1");
   const [endVerse, setEndVerse] = useState("7");
+  const [juzFrom, setJuzFrom] = useState(1);
+  const [juzTo, setJuzTo] = useState(1);
+  const [queued, setQueued] = useState<AyahRange[]>([]);
   const [reciter, setReciter] = useState(DEFAULT_RECITER);
   const [repeat, setRepeat] = useState(5);
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>(preselect ? [preselect] : []);
   const [previewHtml, setPreviewHtml] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -50,8 +64,6 @@ export default function NewAssignment() {
 
   const startSurah = getSurah(startSurahNum);
   const endSurah = getSurah(endSurahNum);
-
-  const router = useRouter();
 
   useEffect(() => {
     const supabase = createClient();
@@ -89,107 +101,12 @@ export default function NewAssignment() {
     });
   }, []);
 
-  async function handleSubmit() {
-    setSubmitError("");
-    setSubmitting(true);
-
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const today = new Date().toISOString().split("T")[0];
-    const sv = parseInt(startVerse) || 1;
-    const ev = parseInt(endVerse) || 1;
-
-    // Create an assignment for each selected student
-    for (const slotId of selected) {
-      const slot = students.find((s) => s.id === slotId);
-      if (!slot) continue;
-
-      // Create assignment using student_slot_id (works for both claimed and unclaimed)
-      const assignmentData: Record<string, unknown> = {
-        student_slot_id: slotId,
-        halaqa_id: slot.halaqa_id,
-        date: today,
-        created_by: user.id,
-      };
-      // Also set student_id if the student has claimed their account
-      if (slot.claimed_by) {
-        assignmentData.student_id = slot.claimed_by;
-      }
-
-      // Check if assignment already exists for this slot + date
-      const { data: existing } = await supabase
-        .from("assignments")
-        .select("id")
-        .eq("student_slot_id", slotId)
-        .eq("date", today)
-        .limit(1);
-
-      let assignment;
-      let aErr;
-
-      if (existing && existing.length > 0) {
-        assignment = existing[0];
-      } else {
-        const result = await supabase
-          .from("assignments")
-          .insert(assignmentData)
-          .select()
-          .single();
-        assignment = result.data;
-        aErr = result.error;
-      }
-
-      if (aErr) {
-        console.error("Assignment error:", aErr);
-        setSubmitError(aErr.message);
-        setSubmitting(false);
-        return;
-      }
-
-      // Create assignment item
-      const { error: iErr } = await supabase
-        .from("assignment_items")
-        .insert({
-          assignment_id: assignment.id,
-          lesson_type_id: category,
-          surah: startSurahNum,
-          start_ayah: sv,
-          end_ayah: ev,
-          reciter_ref: reciter,
-          repetitions: repeat,
-        });
-
-      if (iErr) {
-        console.error("Item error:", iErr);
-        setSubmitError(iErr.message);
-        setSubmitting(false);
-        return;
-      }
-
-      // Update student slot's current lesson
-      await supabase.from("student_slots").update({
-        current_surah: `${startSurah?.name} (${startSurahNum})`,
-        current_verse: `${sv}–${ev}`,
-        updated_at: new Date().toISOString(),
-      }).eq("id", slotId);
-    }
-
-    setSubmitting(false);
-    setSubmitted(true);
-    setTimeout(() => router.push("/instructor/assignments"), 1500);
-  }
-
-  // Load preview verse
-  useEffect(() => {
-    const sv = parseInt(startVerse) || 0;
-    if (sv >= 1 && startSurah && sv <= startSurah.verses) {
-      getVerseRange(startSurahNum, sv, startSurahNum, sv).then((v) => {
-        setPreviewHtml(v[0]?.text || "");
-      });
-    }
-  }, [startSurahNum, startVerse, startSurah]);
+  const current: AyahRange = useMemo(() => ({
+    surah: startSurahNum,
+    startAyah: parseInt(startVerse) || 1,
+    endSurah: endSurahNum,
+    endAyah: parseInt(endVerse) || 1,
+  }), [startSurahNum, endSurahNum, startVerse, endVerse]);
 
   const validation = useMemo(() => {
     const sv = parseInt(startVerse) || 0;
@@ -216,6 +133,108 @@ export default function NewAssignment() {
     return { errors, valid: errors.length === 0, totalAyat: total };
   }, [startSurahNum, endSurahNum, startVerse, endVerse, startSurah, endSurah]);
 
+  // All ranges that will be saved: queued ones plus the one being edited (if valid).
+  const allRanges = useMemo(
+    () => (validation.valid ? [...queued, current] : queued),
+    [queued, current, validation.valid],
+  );
+
+  async function handleSubmit() {
+    if (allRanges.length === 0) return;
+    setSubmitError("");
+    setSubmitting(true);
+
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    for (const slotId of selected) {
+      const slot = students.find((s) => s.id === slotId);
+      if (!slot) continue;
+
+      const assignmentData: Record<string, unknown> = {
+        student_slot_id: slotId,
+        halaqa_id: slot.halaqa_id,
+        date,
+        created_by: user.id,
+      };
+      if (slot.claimed_by) assignmentData.student_id = slot.claimed_by;
+
+      const { data: existing } = await supabase
+        .from("assignments")
+        .select("id")
+        .eq("student_slot_id", slotId)
+        .eq("date", date)
+        .limit(1);
+
+      let assignmentId: string;
+      if (existing && existing.length > 0) {
+        assignmentId = existing[0].id;
+      } else {
+        const { data, error } = await supabase
+          .from("assignments")
+          .insert(assignmentData)
+          .select("id")
+          .single();
+        if (error || !data) {
+          setSubmitError(error?.message || "Could not create assignment.");
+          setSubmitting(false);
+          return;
+        }
+        assignmentId = data.id;
+      }
+
+      const { error: iErr } = await supabase
+        .from("assignment_items")
+        .insert(allRanges.map((r) => ({
+          assignment_id: assignmentId,
+          lesson_type_id: category,
+          surah: r.surah,
+          start_ayah: r.startAyah,
+          end_surah: r.endSurah,
+          end_ayah: r.endAyah,
+          reciter_ref: reciter,
+          repetitions: repeat,
+        })));
+
+      if (iErr) {
+        setSubmitError(iErr.message);
+        setSubmitting(false);
+        return;
+      }
+
+      const first = allRanges[0];
+      await supabase.from("student_slots").update({
+        current_surah: `${getSurah(first.surah)?.name} (${first.surah})`,
+        current_verse: first.surah === first.endSurah
+          ? `${first.startAyah}–${first.endAyah}`
+          : `${first.startAyah} → ${first.endSurah}:${first.endAyah}`,
+        updated_at: new Date().toISOString(),
+      }).eq("id", slotId);
+    }
+
+    setSubmitting(false);
+    setSubmitted(true);
+    const back = preselect ? `/instructor/students/${preselect}` : "/instructor/assignments";
+    setTimeout(() => router.push(back), 900);
+  }
+
+  useEffect(() => {
+    const sv = parseInt(startVerse) || 0;
+    if (sv >= 1 && startSurah && sv <= startSurah.verses) {
+      getVerseRange(startSurahNum, sv, startSurahNum, sv).then((v) => {
+        setPreviewHtml(v[0]?.text || "");
+      });
+    }
+  }, [startSurahNum, startVerse, startSurah]);
+
+  function applyRange(r: AyahRange) {
+    setStartSurahNum(r.surah);
+    setEndSurahNum(r.endSurah);
+    setStartVerse(String(r.startAyah));
+    setEndVerse(String(r.endAyah));
+  }
+
   function handleStartSurahChange(num: number) {
     setStartSurahNum(num);
     setEndSurahNum(num);
@@ -230,12 +249,23 @@ export default function NewAssignment() {
     else { const s = getSurah(num); setEndVerse(s ? String(s.verses) : "1"); }
   }
 
+  function queueCurrent() {
+    if (!validation.valid) return;
+    setQueued((q) => [...q, current]);
+    // Start the next range right after the one just added.
+    const s = getSurah(current.endSurah)!;
+    if (current.endAyah < s.verses) {
+      applyRange({ surah: current.endSurah, startAyah: current.endAyah + 1, endSurah: current.endSurah, endAyah: s.verses });
+    } else if (current.endSurah < 114) {
+      const n = getSurah(current.endSurah + 1)!;
+      applyRange({ surah: n.number, startAyah: 1, endSurah: n.number, endAyah: n.verses });
+    }
+  }
+
   const toggle = (id: string) =>
     setSelected((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
 
-  const rangeLabel = startSurahNum === endSurahNum
-    ? `${startSurah?.name} ${startSurahNum}:${startVerse}–${endVerse}`
-    : `${startSurah?.name} ${startSurahNum}:${startVerse} – ${endSurah?.name} ${endSurahNum}:${endVerse}`;
+  const canSend = allRanges.length > 0 && selected.length > 0 && !submitting && !!category;
 
   if (loading) {
     return (
@@ -253,14 +283,15 @@ export default function NewAssignment() {
         borderBottom: "1px solid var(--rule-1)", flexWrap: "wrap", gap: 12,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14, color: "var(--ink-2)", fontSize: 12.5 }}>
-          <Link href="/instructor/assignments" style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "inherit", textDecoration: "none" }}>
-            <IcoBack /> Assignments
+          <Link href={preselect ? `/instructor/students/${preselect}` : "/instructor/assignments"}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "inherit", textDecoration: "none" }}>
+            <IcoBack /> {preselect ? "Student" : "Assignments"}
           </Link>
           <span>/</span>
           <span style={{ color: "var(--ink-0)" }}>New</span>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className="hh-btn primary" disabled={!validation.valid || selected.length === 0 || submitting} onClick={handleSubmit}>
+          <button className="hh-btn primary" disabled={!canSend} onClick={handleSubmit}>
             {submitting ? "Sending..." : submitted ? "Sent!" : `Send to ${selected.length} student${selected.length === 1 ? "" : "s"}`}
           </button>
         </div>
@@ -273,11 +304,10 @@ export default function NewAssignment() {
 
         <Eyebrow>New assignment</Eyebrow>
         <h1 className="hh-display" style={{ fontSize: 32, margin: "6px 0 32px" }}>
-          What are they learning today?
+          What are they learning?
         </h1>
 
-        {/* Lesson type */}
-        {categories.length > 0 && (
+        {categories.length > 0 ? (
           <Field label="Lesson type">
             <div className="hh-role-grid" style={{ maxWidth: "100%" }}>
               {categories.map((c) => {
@@ -298,6 +328,32 @@ export default function NewAssignment() {
               })}
             </div>
           </Field>
+        ) : (
+          <p style={{ color: "var(--ink-2)", fontSize: 13 }}>
+            No active lesson types. <Link href="/instructor/categories">Enable one</Link> first.
+          </p>
+        )}
+
+        <div style={{ marginTop: 24, maxWidth: 220 }}>
+          <Field label="For class on">
+            <input className="hh-input hh-num" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </Field>
+        </div>
+
+        {/* Queued ranges */}
+        {queued.length > 0 && (
+          <div style={{ marginTop: 24 }}>
+            <div className="hh-overline" style={{ marginBottom: 8 }}>Ranges in this lesson</div>
+            {queued.map((r, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", background: "var(--paper-3)", marginBottom: 4 }}>
+                <span className="hh-serif" style={{ fontSize: 13.5 }}>{rangeLabel(r)}</span>
+                <button onClick={() => setQueued((q) => q.filter((_, j) => j !== i))}
+                  style={{ border: 0, background: "transparent", color: "var(--ink-2)", cursor: "pointer", fontSize: 12 }}>
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
         )}
 
         {/* Surah + verse range */}
@@ -322,6 +378,27 @@ export default function NewAssignment() {
           </Field>
         </div>
 
+        {/* Juz quick-fill */}
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 12, marginTop: 16, flexWrap: "wrap" }}>
+          <div style={{ width: 110 }}>
+            <Field label="Or by juz">
+              <select className="hh-input hh-num" value={juzFrom} onChange={(e) => { const v = +e.target.value; setJuzFrom(v); if (juzTo < v) setJuzTo(v); }} style={{ appearance: "auto" }}>
+                {Array.from({ length: 30 }, (_, i) => i + 1).map((j) => <option key={j} value={j}>{j}</option>)}
+              </select>
+            </Field>
+          </div>
+          <div style={{ width: 110 }}>
+            <Field label="to juz">
+              <select className="hh-input hh-num" value={juzTo} onChange={(e) => setJuzTo(+e.target.value)} style={{ appearance: "auto" }}>
+                {Array.from({ length: 30 }, (_, i) => i + 1).filter((j) => j >= juzFrom).map((j) => <option key={j} value={j}>{j}</option>)}
+              </select>
+            </Field>
+          </div>
+          <button className="hh-btn" type="button" onClick={() => applyRange(juzRange(juzFrom, juzTo))} style={{ marginBottom: 1 }}>
+            Fill range
+          </button>
+        </div>
+
         {validation.errors.length > 0 && (
           <div style={{ marginTop: 16, padding: "12px 14px", background: "var(--paper-3)" }}>
             {validation.errors.map((err, i) => (
@@ -333,11 +410,20 @@ export default function NewAssignment() {
         {validation.valid && previewHtml && (
           <div style={{ marginTop: 20, padding: "28px 30px", background: "var(--paper-3)" }}>
             <div className="hh-eyebrow" style={{ marginBottom: 10, textAlign: "center" }}>
-              Preview · {rangeLabel} · {validation.totalAyat} ayāt
+              Preview · {rangeLabel(current)} · {validation.totalAyat} ayāt
             </div>
             <VerseText html={previewHtml} style={{ fontSize: "1.6rem", textAlign: "center" }} />
           </div>
         )}
+
+        <div style={{ marginTop: 16 }}>
+          <button className="hh-btn" type="button" disabled={!validation.valid} onClick={queueCurrent}>
+            + Add another range
+          </button>
+          <span style={{ fontSize: 11.5, color: "var(--ink-3)", marginLeft: 12 }}>
+            For Review lessons with several passages.
+          </span>
+        </div>
 
         <hr className="hh-rule" style={{ margin: "40px 0" }} />
 
@@ -357,7 +443,9 @@ export default function NewAssignment() {
 
         <div className="hh-overline" style={{ marginBottom: 14 }}>Send to</div>
         {students.length === 0 ? (
-          <p style={{ color: "var(--ink-2)", fontSize: 13 }}>No students in your roster yet.</p>
+          <p style={{ color: "var(--ink-2)", fontSize: 13 }}>
+            No students yet. <Link href="/instructor/classes">Add one in Classes</Link>.
+          </p>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 8 }}>
             {students.map((s) => {
@@ -389,5 +477,13 @@ export default function NewAssignment() {
         )}
       </div>
     </>
+  );
+}
+
+export default function NewAssignment() {
+  return (
+    <Suspense fallback={<div style={{ padding: "22px 36px" }}><p style={{ color: "var(--ink-2)", fontSize: 13 }}>Loading...</p></div>}>
+      <NewAssignmentForm />
+    </Suspense>
   );
 }
