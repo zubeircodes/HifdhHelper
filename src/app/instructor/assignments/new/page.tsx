@@ -5,6 +5,7 @@ import { Eyebrow, IcoBack, IcoCheck, Avatar, VerseText } from "@/components/atom
 import { SURAHS, getSurah, juzRange, rangeLabel, type AyahRange } from "@/lib/quran-meta";
 import { getVerseRange } from "@/lib/quran-text";
 import { createClient } from "@/lib/supabase";
+import { loadSlotAssignments, itemLabel, type AssignmentItem } from "@/lib/assignments";
 import { RECITERS, DEFAULT_RECITER } from "@/lib/audio";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -40,6 +41,7 @@ function NewAssignmentForm() {
   const params = useSearchParams();
   const router = useRouter();
   const preselect = params.get("student");
+  const fromAssignment = params.get("from");
 
   const [categories, setCategories] = useState<LessonType[]>([]);
   const [students, setStudents] = useState<StudentSlot[]>([]);
@@ -61,6 +63,10 @@ function NewAssignmentForm() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  // Suggestions built from the student's last lesson (when ?from= is set).
+  const [redoItems, setRedoItems] = useState<AssignmentItem[]>([]);
+  const [nextNew, setNextNew] = useState<AyahRange | null>(null);
+  const [newTypeId, setNewTypeId] = useState<string | null>(null);
 
   const startSurah = getSurah(startSurahNum);
   const endSurah = getSurah(endSurahNum);
@@ -97,8 +103,37 @@ function NewAssignmentForm() {
 
         if (slots) setStudents(slots);
       }
+
+      if (preselect && fromAssignment) {
+        const past = await loadSlotAssignments(supabase, preselect, 10);
+        const last = past.find((a) => a.id === fromAssignment) ?? past[0];
+        if (last) {
+          setRedoItems(last.items.filter((i) => i.evaluation?.result === "redo"));
+          // Continue the most recent New Lesson from where it ended, same length.
+          const newType = types?.find((t) => /new/i.test(t.name));
+          if (newType) {
+            setNewTypeId(newType.id);
+            const lastNew = past
+              .flatMap((a) => a.items)
+              .find((i) => i.lesson_type_id === newType.id);
+            if (lastNew) {
+              const len = lastNew.surah === lastNew.end_surah
+                ? lastNew.end_ayah - lastNew.start_ayah + 1
+                : 5;
+              const s = getSurah(lastNew.end_surah)!;
+              if (lastNew.end_ayah < s.verses) {
+                setNextNew({ surah: lastNew.end_surah, startAyah: lastNew.end_ayah + 1, endSurah: lastNew.end_surah, endAyah: Math.min(lastNew.end_ayah + len, s.verses) });
+              } else if (lastNew.end_surah < 114) {
+                const n = getSurah(lastNew.end_surah + 1)!;
+                setNextNew({ surah: n.number, startAyah: 1, endSurah: n.number, endAyah: Math.min(len, n.verses) });
+              }
+            }
+          }
+        }
+      }
       setLoading(false);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const current: AyahRange = useMemo(() => ({
@@ -339,6 +374,40 @@ function NewAssignmentForm() {
             <input className="hh-input hh-num" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </Field>
         </div>
+
+        {(redoItems.length > 0 || nextNew) && (
+          <div style={{ marginTop: 24, padding: "14px 16px", background: "var(--paper-3)" }}>
+            <div className="hh-overline" style={{ marginBottom: 10 }}>From last lesson</div>
+            {redoItems.length > 0 && (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: nextNew ? 10 : 0 }}>
+                <span style={{ fontSize: 12.5, color: "var(--ink-1)" }}>
+                  {redoItems.length === 1 ? "1 range" : `${redoItems.length} ranges`} marked Redo:{" "}
+                  <span className="hh-serif">{redoItems.map(itemLabel).join(", ")}</span>
+                </span>
+                <button className="hh-btn" type="button" onClick={() => {
+                  setQueued((q) => [...q, ...redoItems.map((i) => ({ surah: i.surah, startAyah: i.start_ayah, endSurah: i.end_surah, endAyah: i.end_ayah }))]);
+                  setRedoItems([]);
+                }}>
+                  Carry over
+                </button>
+              </div>
+            )}
+            {nextNew && (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 12.5, color: "var(--ink-1)" }}>
+                  Next new lesson: <span className="hh-serif">{rangeLabel(nextNew)}</span>
+                </span>
+                <button className="hh-btn" type="button" onClick={() => {
+                  applyRange(nextNew);
+                  if (newTypeId) setCategory(newTypeId);
+                  setNextNew(null);
+                }}>
+                  Use it
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Queued ranges */}
         {queued.length > 0 && (

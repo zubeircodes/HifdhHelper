@@ -6,7 +6,7 @@ import { PracticePlayer } from "@/components/practice/practice-player";
 import Link from "next/link";
 
 export default function Landing() {
-  const [showInfo, setShowInfo] = useState(false);
+  const [showInfo, setShowInfo] = useState(true);
 
   return (
     <div className={`hh-landing${showInfo ? " is-expanded" : ""}`}>
@@ -25,7 +25,7 @@ export default function Landing() {
               fontWeight: showInfo ? 500 : 400, fontSize: "inherit",
             }}
           >
-            {showInfo ? "Close" : "For schools & teachers"}
+            {showInfo ? "Just practice" : "For teachers"}
           </button>
           <Link href="/login" style={{ color: "var(--ink-0)", fontWeight: 500, textDecoration: "none" }}>
             Sign in
@@ -37,16 +37,17 @@ export default function Landing() {
         {/* Info panel — hidden until requested; stays mounted so the player keeps playing */}
         <div id="landing-info" className="hh-landing-info" hidden={!showInfo}>
           <div style={{ maxWidth: 420 }}>
-            <Eyebrow>For schools &amp; teachers</Eyebrow>
+            <Eyebrow>For hifdh teachers</Eyebrow>
             <h1 className="hh-display hh-hero-title" style={{ fontSize: 40, margin: "16px 0 18px" }}>
-              Run your
+              Every student&apos;s
               <br />
-              <span style={{ fontStyle: "italic", color: "var(--sage-deep)" }}>halaqah</span> here, too.
+              <span style={{ fontStyle: "italic", color: "var(--sage-deep)" }}>sabaq</span>, in one place.
             </h1>
             <p style={{ fontSize: 14.5, lineHeight: 1.65, color: "var(--ink-1)", margin: "0 0 28px" }}>
-              Assign daily lessons to each student, set how many times they should
-              listen, and grade their recitation. Students see today&apos;s lesson
-              the moment they open the app, and practice stays free for everyone.
+              Keep track of what each student is memorising, what they&apos;re
+              revising, and how they did — without a notebook. Works on its own
+              for record keeping; link students when you&apos;re ready and they
+              get their lesson on their phone.
             </p>
             <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
               <Link href="/signup" className="hh-btn primary lg" style={{ textDecoration: "none" }}>
@@ -61,17 +62,20 @@ export default function Landing() {
             </div>
 
             <div style={{ marginTop: 48, paddingTop: 24, borderTop: "1px solid var(--rule-1)" }}>
-              <div className="hh-eyebrow" style={{ marginBottom: 10 }}>What teachers get</div>
-              <ul className="hh-serif" style={{ margin: 0, paddingLeft: 18, listStyle: "disc", fontSize: 14.5, lineHeight: 1.8, color: "var(--ink-1)" }}>
-                <li>One roster per class, with a join code for each student</li>
-                <li>Daily assignments by verse range, reciter, and repeats</li>
-                <li>Pass, partial, or redo grading with a note for the family</li>
-                <li>Your own lesson categories, not someone else&apos;s</li>
-              </ul>
+              <div className="hh-eyebrow" style={{ marginBottom: 12 }}>How it works</div>
+              <ol className="hh-serif" style={{ margin: 0, paddingLeft: 20, fontSize: 14.5, lineHeight: 1.8, color: "var(--ink-1)" }}>
+                <li>Create a class and add your students by name.</li>
+                <li>Assign each one a lesson: new verses, review ranges, or subac by juz, with a reciter and repeat count.</li>
+                <li>On class day, open the student, grade each range Pass or Redo, add a note.</li>
+                <li>Redo ranges carry into the next lesson; every grade stays in their history.</li>
+              </ol>
+              <p style={{ fontSize: 12.5, color: "var(--ink-2)", margin: "16px 0 0", lineHeight: 1.6 }}>
+                Students who join with their code see the lesson, listen the set number of times, and mark it ready before class.
+              </p>
             </div>
 
             <div style={{ marginTop: 40, fontSize: 10.5, color: "var(--ink-3)", letterSpacing: "0.04em" }}>
-              Built with care · For your family or your madrasah
+              Free while we get it right · Built for halaqat and madrasahs
             </div>
           </div>
         </div>
