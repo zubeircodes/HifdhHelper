@@ -25,14 +25,34 @@ src/
     atoms/              # Wordmark, Avatar, VerseMark, Word, Streak, Status, etc.
     shells/             # MobileShell, DesktopChrome layout frames
     practice/           # PracticePlayer — free listen-and-repeat tool (landing + student tab)
-  lib/                  # Supabase client utilities
+  lib/                  # Supabase clients, Quran metadata (surahs, juz), shared assignment queries
 supabase/
   migrations/           # SQL migrations (schema, RLS, RPC functions)
 claude/
   backend.md            # Backend spec (Supabase schema, phases, RPC functions)
   ui.md                 # UI implementation notes from design handoff
-text/
+public/text/
   qpc-hafs-tajweed.json       # Quran text with tajweed markup
   digital-khatt-v2Text.json   # Quran text word-by-word (iOS fallback)
 DESIGN.md               # Design system spec (palette, type, components, screens)
 ```
+
+## How teachers use it
+
+1. Sign up as an instructor, create a class, add students by name.
+2. Each student gets a 6-character code. They sign up as a student and enter it
+   on **Join** to link their account. Teachers can keep records without this.
+3. **Assign** a lesson: pick a type (New Lesson, Review, Subac, or your own),
+   a surah/ayah range (or fill from a juz range), reciter and repeat count.
+   Review lessons can hold several ranges.
+4. On class day, open **Evaluations**, pick the student, grade each range
+   Pass or Redo with a note, then assign the next lesson.
+5. Each student's page shows their recent graded lessons; **View all** shows
+   the full history.
+
+## Database
+
+Migrations live in `supabase/migrations/` and apply cleanly to an empty
+database in order. Apply the latest with `supabase db push` (or paste into the
+SQL editor). `20261028_001_sprint1_lean.sql` drops the old invite-code
+tables, reseeds lesson types, and adds `end_surah` so ranges can cross surahs.

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Eyebrow, Avatar, Status } from "@/components/atoms";
 import { createClient } from "@/lib/supabase";
+import { formatDate, type Assignment } from "@/lib/assignments";
 import Link from "next/link";
 
 interface StudentSlot {
@@ -12,8 +13,7 @@ interface StudentSlot {
   current_verse: string | null;
   claimed_by: string | null;
   halaqa_id: string;
-  passed: number;
-  total: number;
+  latest: Assignment | null;
 }
 
 interface Halaqa {
@@ -55,53 +55,41 @@ export default function InstructorDashboard() {
           .in("halaqa_id", halaqaIds)
           .order("student_name", { ascending: true });
 
-        // Get lesson type count for this instructor
-        const { data: lessonTypes } = await supabase
-          .from("lesson_types")
-          .select("id")
-          .eq("instructor_id", user.id)
-          .eq("is_active", true);
-
-        const totalCategories = lessonTypes?.length || 0;
-
         if (slots) {
-          // For each student, find their latest assignment and check
-          // how many lesson categories have a "pass" evaluation
-          const slotsWithEvals = await Promise.all(
-            slots.map(async (slot) => {
-              // Get the most recent assignment for this student
-              const { data: latestAssignment } = await supabase
-                .from("assignments")
-                .select("id")
-                .eq("student_slot_id", slot.id)
-                .order("date", { ascending: false })
-                .limit(1);
+          // One query for every slot's assignments, newest first; keep the
+          // latest per slot. Replaces 4 round trips per student.
+          const { data: rows } = await supabase
+            .from("assignments")
+            .select("id, date, student_slot_id, assignment_items(id, lesson_type_id, surah, start_ayah, end_surah, end_ayah, reciter_ref, repetitions, lesson_types(name), evaluations(result, note, evaluated_at))")
+            .in("student_slot_id", slots.map((s) => s.id))
+            .order("date", { ascending: false })
+            .limit(1000);
 
-              if (!latestAssignment || latestAssignment.length === 0) {
-                return { ...slot, passed: 0, total: totalCategories };
-              }
+          const latestBySlot = new Map<string, Assignment>();
+          /* eslint-disable @typescript-eslint/no-explicit-any */
+          for (const r of (rows || []) as any[]) {
+            if (latestBySlot.has(r.student_slot_id)) continue;
+            const one = (v: any) => (Array.isArray(v) ? v[0] : v);
+            latestBySlot.set(r.student_slot_id, {
+              id: r.id,
+              date: r.date,
+              items: (r.assignment_items || []).map((it: any) => ({
+                id: it.id,
+                lesson_type_id: it.lesson_type_id,
+                lesson_type_name: one(it.lesson_types)?.name ?? "Lesson",
+                surah: it.surah,
+                start_ayah: it.start_ayah,
+                end_surah: it.end_surah ?? it.surah,
+                end_ayah: it.end_ayah,
+                reciter_ref: it.reciter_ref,
+                repetitions: it.repetitions,
+                evaluation: one(it.evaluations) ?? null,
+              })),
+            });
+          }
+          /* eslint-enable @typescript-eslint/no-explicit-any */
 
-              // Get items + evals for the latest assignment
-              const { data: items } = await supabase
-                .from("assignment_items")
-                .select("id, lesson_type_id")
-                .eq("assignment_id", latestAssignment[0].id);
-
-              if (!items || items.length === 0) {
-                return { ...slot, passed: 0, total: totalCategories };
-              }
-
-              const itemIds = items.map((i) => i.id);
-              const { data: evals } = await supabase
-                .from("evaluations")
-                .select("assignment_item_id, result")
-                .in("assignment_item_id", itemIds);
-
-              const passed = evals?.filter((e) => e.result === "pass").length || 0;
-              return { ...slot, passed, total: totalCategories };
-            })
-          );
-          setStudents(slotsWithEvals);
+          setStudents(slots.map((slot) => ({ ...slot, latest: latestBySlot.get(slot.id) ?? null })));
         }
       }
       setLoading(false);
@@ -137,7 +125,7 @@ export default function InstructorDashboard() {
             <div className="hh-display hh-num" style={{ fontSize: 20, marginTop: 2 }}>{students.length}</div>
           </div>
           <div>
-            <div className="hh-eyebrow">Active</div>
+            <div className="hh-eyebrow">Linked</div>
             <div className="hh-display hh-num" style={{ fontSize: 20, marginTop: 2 }}>{students.filter((s) => s.claimed_by).length}</div>
           </div>
         </div>
@@ -167,9 +155,18 @@ export default function InstructorDashboard() {
         )}
 
         {students.length === 0 ? (
-          <div style={{ padding: "32px 0", textAlign: "center" }}>
-            <p style={{ color: "var(--ink-2)", fontSize: 13, margin: "0 0 8px" }}>No students yet.</p>
-            <p style={{ color: "var(--ink-3)", fontSize: 12 }}>Add students from the Classes tab.</p>
+          <div style={{ padding: "40px 0", textAlign: "center" }}>
+            <p className="hh-serif" style={{ color: "var(--ink-0)", fontSize: 17, margin: "0 0 6px" }}>
+              {classes.length === 0 ? "Start with a class" : "Now add your students"}
+            </p>
+            <p style={{ color: "var(--ink-2)", fontSize: 12.5, margin: "0 0 18px" }}>
+              {classes.length === 0
+                ? "Create a class, add students by name, and give each one their code."
+                : "Each student gets a code to link their own account — or just keep records here."}
+            </p>
+            <Link href="/instructor/classes" className="hh-btn primary" style={{ textDecoration: "none" }}>
+              {classes.length === 0 ? "Create a class" : "Add students"}
+            </Link>
           </div>
         ) : filteredStudents.length === 0 ? (
           <p style={{ color: "var(--ink-2)", fontSize: 13, padding: "32px 0", textAlign: "center" }}>No students in this class.</p>
@@ -180,7 +177,7 @@ export default function InstructorDashboard() {
                 <tr style={{ textAlign: "left", color: "var(--ink-2)", fontSize: 11, letterSpacing: "0.04em", textTransform: "uppercase" }}>
                   <th style={{ padding: "10px 0", fontWeight: 500, width: "30%" }}>Student</th>
                   <th style={{ padding: "10px 0", fontWeight: 500, width: "30%" }}>Current lesson</th>
-                  <th style={{ padding: "10px 0", fontWeight: 500, width: "15%" }}>Passed</th>
+                  <th style={{ padding: "10px 0", fontWeight: 500, width: "22%" }}>Last lesson</th>
                   {classes.length > 1 && (
                     <th style={{ padding: "10px 0", fontWeight: 500, width: "15%" }}>Class</th>
                   )}
@@ -200,12 +197,21 @@ export default function InstructorDashboard() {
                     <td style={{ padding: "16px 0", color: "var(--ink-1)", fontSize: 13 }} className="hh-serif">
                       {s.current_surah ? `${s.current_surah} : ${s.current_verse || "1"}` : "—"}
                     </td>
-                    <td style={{ padding: "16px 0", fontSize: 13 }} className="hh-num">
-                      {s.total > 0 ? (
-                        <span style={{ color: s.passed === s.total ? "var(--pass)" : "var(--ink-1)" }}>
-                          {s.passed}/{s.total}
-                        </span>
-                      ) : (
+                    <td style={{ padding: "16px 0", fontSize: 12.5 }}>
+                      {s.latest ? (() => {
+                        const total = s.latest.items.length;
+                        const graded = s.latest.items.filter((i) => i.evaluation).length;
+                        const passed = s.latest.items.filter((i) => i.evaluation?.result === "pass").length;
+                        const done = total > 0 && graded === total;
+                        return (
+                          <Link href={`/instructor/evaluate/${s.id}?assignment=${s.latest.id}`} style={{ color: "inherit", textDecoration: "none" }}>
+                            <span className="hh-num" style={{ color: "var(--ink-1)" }}>{formatDate(s.latest.date)}</span>
+                            <span style={{ display: "block", fontSize: 11, marginTop: 2, color: done ? (passed === total ? "var(--pass)" : "var(--ink-2)") : "var(--ink-2)" }}>
+                              {done ? `${passed}/${total} passed` : `${graded}/${total} graded`}
+                            </span>
+                          </Link>
+                        );
+                      })() : (
                         <span style={{ color: "var(--ink-3)" }}>—</span>
                       )}
                     </td>
@@ -216,9 +222,9 @@ export default function InstructorDashboard() {
                     )}
                     <td style={{ padding: "16px 0", textAlign: "right" }}>
                       {s.claimed_by ? (
-                        <Status kind="pass">Active</Status>
+                        <Status kind="pass">Linked</Status>
                       ) : (
-                        <Status kind="muted">Unclaimed</Status>
+                        <Status kind="muted">Not linked</Status>
                       )}
                     </td>
                   </tr>

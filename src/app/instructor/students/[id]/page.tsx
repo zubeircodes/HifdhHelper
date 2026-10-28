@@ -1,8 +1,12 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
-import { Eyebrow, Avatar, IcoBack } from "@/components/atoms";
+import { Avatar, IcoBack, Status } from "@/components/atoms";
 import { createClient } from "@/lib/supabase";
+import {
+  loadSlotAssignments, itemLabel, statusKind, resultLabel, formatDate,
+  type Assignment,
+} from "@/lib/assignments";
 import Link from "next/link";
 
 interface StudentSlot {
@@ -14,6 +18,8 @@ interface StudentSlot {
   claim_code: string;
 }
 
+const RECENT = 5;
+
 function getInitials(name: string): string {
   const parts = name.split(" ");
   return parts.length >= 2
@@ -24,18 +30,22 @@ function getInitials(name: string): string {
 export default function InstructorStudentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [student, setStudent] = useState<StudentSlot | null>(null);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [showAll, setShowAll] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.from("student_slots")
-      .select("id, student_name, current_surah, current_verse, claimed_by, claim_code")
-      .eq("id", id)
-      .single()
-      .then(({ data }) => {
-        if (data) setStudent(data);
-        setLoading(false);
-      });
+    (async () => {
+      const { data } = await supabase
+        .from("student_slots")
+        .select("id, student_name, current_surah, current_verse, claimed_by, claim_code")
+        .eq("id", id)
+        .single();
+      if (data) setStudent(data);
+      setAssignments(await loadSlotAssignments(supabase, id, 200));
+      setLoading(false);
+    })();
   }, [id]);
 
   if (loading || !student) {
@@ -45,6 +55,14 @@ export default function InstructorStudentPage({ params }: { params: Promise<{ id
       </div>
     );
   }
+
+  // Flatten to one row per item, newest first (assignments already newest first).
+  const rows = assignments.flatMap((a) => a.items.map((it) => ({ a, it })));
+  const graded = rows.filter((r) => r.it.evaluation);
+  const pending = rows.filter((r) => !r.it.evaluation);
+  const passed = graded.filter((r) => r.it.evaluation!.result === "pass").length;
+  const visible = showAll ? graded : graded.slice(0, RECENT);
+  const assignHref = `/instructor/assignments/new?student=${student.id}`;
 
   return (
     <>
@@ -60,9 +78,14 @@ export default function InstructorStudentPage({ params }: { params: Promise<{ id
           <span>/</span>
           <span style={{ color: "var(--ink-0)" }}>{student.student_name}</span>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <Link href={`/instructor/evaluate/${student.id}`} className="hh-btn primary" style={{ textDecoration: "none" }}>
-            Evaluate today
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {pending.length > 0 && (
+            <Link href={`/instructor/evaluate/${student.id}`} className="hh-btn ghost" style={{ textDecoration: "none" }}>
+              Grade {pending.length === 1 ? "lesson" : `${pending.length} lessons`}
+            </Link>
+          )}
+          <Link href={assignHref} className="hh-btn primary" style={{ textDecoration: "none" }}>
+            Assign next lesson
           </Link>
         </div>
       </div>
@@ -79,24 +102,91 @@ export default function InstructorStudentPage({ params }: { params: Promise<{ id
               </div>
             )}
             <div style={{ fontSize: 11.5, color: "var(--ink-2)", marginTop: 8 }}>
-              {student.claimed_by ? "Account linked" : `Unclaimed · Code: ${student.claim_code}`}
+              {student.claimed_by ? "Account linked" : `Not linked yet · class code ${student.claim_code}`}
+            </div>
+          </div>
+          <div className="hh-instructor-stats" style={{ display: "flex", gap: 28 }}>
+            <div>
+              <div className="hh-eyebrow">Graded</div>
+              <div className="hh-display hh-num" style={{ fontSize: 20, marginTop: 2 }}>{graded.length}</div>
+            </div>
+            <div>
+              <div className="hh-eyebrow">Passed</div>
+              <div className="hh-display hh-num" style={{ fontSize: 20, marginTop: 2, color: graded.length > 0 && passed === graded.length ? "var(--pass)" : undefined }}>
+                {passed}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Placeholder for assignments and evaluations */}
-        <div style={{ marginTop: 36 }}>
-          <div className="hh-overline" style={{ marginBottom: 16 }}>Assignments</div>
-          <p style={{ color: "var(--ink-2)", fontSize: 13, lineHeight: 1.6 }}>
-            Assignment history will appear here once you start assigning lessons to {student.student_name}.
-          </p>
-        </div>
+        {/* Pending */}
+        {pending.length > 0 && (
+          <div style={{ marginTop: 32 }}>
+            <div className="hh-overline" style={{ marginBottom: 12 }}>Waiting to be graded</div>
+            {pending.map(({ a, it }) => (
+              <Link key={it.id} href={`/instructor/evaluate/${student.id}/${it.id}`}
+                style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 14px", background: "var(--paper-3)", marginBottom: 4, textDecoration: "none", color: "inherit" }}>
+                <span className="hh-num" style={{ fontSize: 11.5, color: "var(--ink-2)", width: 96, flexShrink: 0 }}>{formatDate(a.date)}</span>
+                <span style={{ fontSize: 11, color: "var(--ink-2)", width: 90, flexShrink: 0, textTransform: "uppercase", letterSpacing: "0.04em" }}>{it.lesson_type_name}</span>
+                <span className="hh-serif" style={{ fontSize: 14, flex: 1 }}>{itemLabel(it)}</span>
+                <Status kind="muted">Grade</Status>
+              </Link>
+            ))}
+          </div>
+        )}
 
+        {/* History */}
         <div style={{ marginTop: 36 }}>
-          <div className="hh-overline" style={{ marginBottom: 16 }}>Evaluations</div>
-          <p style={{ color: "var(--ink-2)", fontSize: 13, lineHeight: 1.6 }}>
-            Evaluation history will appear here once you evaluate {student.student_name}&apos;s lessons.
-          </p>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
+            <div className="hh-overline">{showAll ? "All lessons" : "Recent lessons"}</div>
+            {graded.length > RECENT && (
+              <button onClick={() => setShowAll((v) => !v)}
+                style={{ border: 0, background: "transparent", color: "var(--ink-1)", cursor: "pointer", fontSize: 12.5, textDecoration: "underline" }}>
+                {showAll ? "Show recent" : `View all ${graded.length}`}
+              </button>
+            )}
+          </div>
+
+          {graded.length === 0 ? (
+            <p style={{ color: "var(--ink-2)", fontSize: 13, lineHeight: 1.6 }}>
+              {rows.length === 0
+                ? <>No lessons yet. <Link href={assignHref}>Assign the first one</Link>.</>
+                : "Nothing graded yet. Grades show here once you evaluate a lesson."}
+            </p>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 520 }}>
+                <thead>
+                  <tr style={{ textAlign: "left", color: "var(--ink-2)", fontSize: 11, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                    <th style={{ padding: "8px 0", fontWeight: 500, width: 110 }}>Date</th>
+                    <th style={{ padding: "8px 0", fontWeight: 500, width: 110 }}>Type</th>
+                    <th style={{ padding: "8px 0", fontWeight: 500 }}>Range</th>
+                    <th style={{ padding: "8px 0", fontWeight: 500, width: 90 }}>Result</th>
+                    <th style={{ padding: "8px 0", fontWeight: 500 }}>Note</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visible.map(({ a, it }) => (
+                    <tr key={it.id} style={{ borderTop: "1px solid var(--rule-1)", verticalAlign: "top" }}>
+                      <td className="hh-num" style={{ padding: "12px 12px 12px 0", fontSize: 12.5, color: "var(--ink-1)", whiteSpace: "nowrap" }}>{formatDate(a.date)}</td>
+                      <td style={{ padding: "12px 12px 12px 0", fontSize: 12, color: "var(--ink-2)" }}>{it.lesson_type_name}</td>
+                      <td style={{ padding: "12px 12px 12px 0" }}>
+                        <Link href={`/instructor/evaluate/${student.id}/${it.id}`} className="hh-serif" style={{ fontSize: 13.5, color: "inherit", textDecoration: "none" }}>
+                          {itemLabel(it)}
+                        </Link>
+                      </td>
+                      <td style={{ padding: "12px 12px 12px 0" }}>
+                        <Status kind={statusKind(it.evaluation!.result)}>{resultLabel(it.evaluation!.result)}</Status>
+                      </td>
+                      <td className="hh-serif" style={{ padding: "12px 0", fontSize: 12.5, color: "var(--ink-1)", lineHeight: 1.5 }}>
+                        {it.evaluation!.note || <span style={{ color: "var(--ink-3)" }}>—</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </>

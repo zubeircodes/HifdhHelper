@@ -3,18 +3,21 @@
 import { useState, useEffect } from "react";
 import { Eyebrow, Avatar, Status, IcoPlus } from "@/components/atoms";
 import { createClient } from "@/lib/supabase";
-import { SURAHS } from "@/lib/quran-meta";
+import { rangeLabel } from "@/lib/quran-meta";
+import { formatDate } from "@/lib/assignments";
 import Link from "next/link";
 
 interface AssignmentRow {
   id: string;
   date: string;
+  student_slot_id: string;
   student_name: string;
   student_initials: string;
   items: {
     lesson_type_name: string;
     surah: number;
     start_ayah: number;
+    end_surah: number;
     end_ayah: number;
     eval_result: string | null;
   }[];
@@ -25,10 +28,6 @@ function getInitials(name: string): string {
   return parts.length >= 2
     ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
     : name.slice(0, 2).toUpperCase();
-}
-
-function getSurahName(num: number): string {
-  return SURAHS.find((s) => s.number === num)?.name || `Surah ${num}`;
 }
 
 export default function AssignmentsPage() {
@@ -50,69 +49,38 @@ export default function AssignmentsPage() {
 
       const halaqaIds = halaqat.map((h) => h.id);
 
-      // Get assignments with slot info
-      const { data: rawAssignments } = await supabase
+      // One nested query: assignments → slot name, items → type + evaluation.
+      const { data: raw } = await supabase
         .from("assignments")
-        .select("id, date, student_slot_id, halaqa_id")
+        .select("id, date, student_slot_id, student_slots(student_name), assignment_items(id, surah, start_ayah, end_surah, end_ayah, lesson_types(name), evaluations(result))")
         .in("halaqa_id", halaqaIds)
+        .not("student_slot_id", "is", null)
         .order("date", { ascending: false })
-        .limit(50);
+        .limit(100);
 
-      if (!rawAssignments || rawAssignments.length === 0) { setLoading(false); return; }
-
-      // Get student names from slots
-      const slotIds = rawAssignments.map((a) => a.student_slot_id).filter(Boolean);
-      const { data: slots } = await supabase
-        .from("student_slots")
-        .select("id, student_name")
-        .in("id", slotIds);
-
-      const slotMap = new Map((slots || []).map((s) => [s.id, s.student_name]));
-
-      // Get assignment items + evaluations
-      const assignmentIds = rawAssignments.map((a) => a.id);
-      const { data: items } = await supabase
-        .from("assignment_items")
-        .select("id, assignment_id, lesson_type_id, surah, start_ayah, end_ayah")
-        .in("assignment_id", assignmentIds);
-
-      // Get lesson type names
-      const { data: types } = await supabase
-        .from("lesson_types")
-        .select("id, name")
-        .eq("instructor_id", user.id);
-
-      const typeMap = new Map((types || []).map((t) => [t.id, t.name]));
-
-      // Get evaluations
-      const itemIds = (items || []).map((i) => i.id);
-      const { data: evals } = itemIds.length > 0
-        ? await supabase.from("evaluations").select("assignment_item_id, result").in("assignment_item_id", itemIds)
-        : { data: [] };
-
-      const evalMap = new Map((evals || []).map((e) => [e.assignment_item_id, e.result]));
-
-      // Build rows
-      const rows: AssignmentRow[] = rawAssignments.map((a) => {
-        const studentName = slotMap.get(a.student_slot_id) || "Unknown";
-        const assignmentItems = (items || [])
-          .filter((i) => i.assignment_id === a.id)
-          .map((i) => ({
-            lesson_type_name: typeMap.get(i.lesson_type_id) || "Unknown",
-            surah: i.surah,
-            start_ayah: i.start_ayah,
-            end_ayah: i.end_ayah,
-            eval_result: evalMap.get(i.id) || null,
-          }));
-
+      /* eslint-disable @typescript-eslint/no-explicit-any */
+      const one = (v: any) => (Array.isArray(v) ? v[0] : v);
+      const rows: AssignmentRow[] = ((raw || []) as any[]).map((a) => {
+        const studentName = one(a.student_slots)?.student_name || "Unknown";
         return {
           id: a.id,
           date: a.date,
+          student_slot_id: a.student_slot_id,
           student_name: studentName,
           student_initials: getInitials(studentName),
-          items: assignmentItems,
+          items: (a.assignment_items || [])
+            .map((i: any) => ({
+              lesson_type_name: one(i.lesson_types)?.name || "Lesson",
+              surah: i.surah,
+              start_ayah: i.start_ayah,
+              end_surah: i.end_surah ?? i.surah,
+              end_ayah: i.end_ayah,
+              eval_result: one(i.evaluations)?.result || null,
+            }))
+            .sort((x: any, y: any) => x.surah - y.surah || x.start_ayah - y.start_ayah),
         };
       });
+      /* eslint-enable @typescript-eslint/no-explicit-any */
 
       setAssignments(rows);
       setLoading(false);
@@ -166,8 +134,10 @@ export default function AssignmentsPage() {
                   const evaluated = a.items.filter((i) => i.eval_result).length;
                   return (
                     <tr key={a.id} style={{ borderTop: "1px solid var(--rule-1)" }}>
-                      <td style={{ padding: "14px 0", fontSize: 12.5, color: "var(--ink-2)" }} className="hh-num">
-                        {a.date}
+                      <td style={{ padding: "14px 0", fontSize: 12.5, color: "var(--ink-2)", whiteSpace: "nowrap" }} className="hh-num">
+                        <Link href={`/instructor/evaluate/${a.student_slot_id}?assignment=${a.id}`} style={{ color: "inherit", textDecoration: "none" }}>
+                          {formatDate(a.date)}
+                        </Link>
                       </td>
                       <td style={{ padding: "14px 0" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -179,7 +149,7 @@ export default function AssignmentsPage() {
                         {a.items.map((item, i) => (
                           <div key={i} style={{ fontSize: 12.5, color: "var(--ink-1)", marginTop: i > 0 ? 4 : 0 }}>
                             <span style={{ color: "var(--ink-2)" }}>{item.lesson_type_name}:</span>{" "}
-                            <span className="hh-serif">{getSurahName(item.surah)} {item.surah}:{item.start_ayah}–{item.end_ayah}</span>
+                            <span className="hh-serif">{rangeLabel({ surah: item.surah, startAyah: item.start_ayah, endSurah: item.end_surah, endAyah: item.end_ayah })}</span>
                           </div>
                         ))}
                       </td>

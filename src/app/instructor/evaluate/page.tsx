@@ -11,6 +11,7 @@ interface StudentSlot {
   current_surah: string | null;
   current_verse: string | null;
   claimed_by: string | null;
+  pending: number;
 }
 
 function getInitials(name: string): string {
@@ -42,7 +43,24 @@ export default function EvaluateList() {
           .in("halaqa_id", halaqaIds)
           .order("student_name", { ascending: true });
 
-        if (slots) setStudents(slots);
+        if (slots) {
+          // Count ungraded items per slot in one query.
+          const { data: items } = await supabase
+            .from("assignment_items")
+            .select("id, assignments!inner(student_slot_id), evaluations(result)")
+            .in("assignments.student_slot_id", slots.map((s) => s.id));
+          const pending = new Map<string, number>();
+          /* eslint-disable @typescript-eslint/no-explicit-any */
+          for (const it of (items || []) as any[]) {
+            const ev = Array.isArray(it.evaluations) ? it.evaluations[0] : it.evaluations;
+            if (ev) continue;
+            const a = Array.isArray(it.assignments) ? it.assignments[0] : it.assignments;
+            const sid = a?.student_slot_id;
+            if (sid) pending.set(sid, (pending.get(sid) || 0) + 1);
+          }
+          /* eslint-enable @typescript-eslint/no-explicit-any */
+          setStudents(slots.map((s) => ({ ...s, pending: pending.get(s.id) || 0 })));
+        }
       }
       setLoading(false);
     });
@@ -74,12 +92,12 @@ export default function EvaluateList() {
       <div className="hh-page-padding" style={{ maxWidth: 640 }}>
         {students.length === 0 ? (
           <p style={{ color: "var(--ink-2)", fontSize: 13, padding: "32px 0", textAlign: "center" }}>
-            No students in your roster yet. Add students from the Students tab.
+            No students yet. <Link href="/instructor/classes">Add one in Classes</Link>.
           </p>
         ) : (
           <>
             <p style={{ color: "var(--ink-2)", fontSize: 13, lineHeight: 1.6, margin: "0 0 24px" }}>
-              Select a student to evaluate today&apos;s lesson.
+              Pick a student to grade their latest lesson.
             </p>
 
             <div className="hh-overline" style={{ marginBottom: 14 }}>Students</div>
@@ -102,8 +120,8 @@ export default function EvaluateList() {
                     {s.current_surah ? `${s.current_surah} : ${s.current_verse || "1"}` : "No lesson assigned"}
                   </div>
                 </div>
-                <Status kind={s.claimed_by ? "pass" : "muted"}>
-                  {s.claimed_by ? "Active" : "Unclaimed"}
+                <Status kind={s.pending > 0 ? "partial" : "muted"}>
+                  {s.pending > 0 ? `${s.pending} to grade` : "Up to date"}
                 </Status>
               </Link>
             ))}

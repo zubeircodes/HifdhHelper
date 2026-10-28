@@ -11,29 +11,15 @@ const roles = [
     id: "student",
     title: "Student",
     body: "I'm memorizing — I want my lessons in one place.",
-    footer: "Join with an invite code from your teacher.",
+    footer: "Join with the code from your teacher.",
     disabled: false,
   },
   {
     id: "instructor",
     title: "Instructor",
     body: "I teach hifdh — for a class, halaqah, or madrasah.",
-    footer: "You'll be able to invite up to 30 students.",
+    footer: "Add classes, assign lessons, track progress.",
     disabled: false,
-  },
-  {
-    id: "parent",
-    title: "Parent",
-    body: "My child is memorizing — I'd like to follow along.",
-    footer: "Coming soon.",
-    disabled: true,
-  },
-  {
-    id: "admin",
-    title: "School admin",
-    body: "I run a madrasah and oversee multiple instructors.",
-    footer: "Coming soon.",
-    disabled: true,
   },
 ];
 

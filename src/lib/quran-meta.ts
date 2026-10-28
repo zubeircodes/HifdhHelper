@@ -127,3 +127,41 @@ export const SURAHS: Surah[] = [
 export function getSurah(number: number): Surah | undefined {
   return SURAHS.find((s) => s.number === number);
 }
+
+// Start of each juz as [surah, ayah]. Juz n runs from JUZ_STARTS[n-1] up to
+// the ayah before JUZ_STARTS[n] (juz 30 ends at 114:6).
+export const JUZ_STARTS: [number, number][] = [
+  [1, 1], [2, 142], [2, 253], [3, 93], [4, 24], [4, 148], [5, 82], [6, 111],
+  [7, 88], [8, 41], [9, 93], [11, 6], [12, 53], [15, 1], [17, 1], [18, 75],
+  [21, 1], [23, 1], [25, 21], [27, 56], [29, 46], [33, 31], [36, 28], [39, 32],
+  [41, 47], [46, 1], [51, 31], [58, 1], [67, 1], [78, 1],
+];
+
+export interface AyahRange {
+  surah: number;
+  startAyah: number;
+  endSurah: number;
+  endAyah: number;
+}
+
+/** Inclusive ayah range covered by juz `from` through juz `to` (1–30). */
+export function juzRange(from: number, to: number): AyahRange {
+  const a = Math.min(Math.max(from, 1), 30);
+  const b = Math.min(Math.max(to, a), 30);
+  const [surah, startAyah] = JUZ_STARTS[a - 1];
+  if (b === 30) return { surah, startAyah, endSurah: 114, endAyah: 6 };
+  const [ns, na] = JUZ_STARTS[b];
+  if (na === 1) {
+    const prev = getSurah(ns - 1)!;
+    return { surah, startAyah, endSurah: ns - 1, endAyah: prev.verses };
+  }
+  return { surah, startAyah, endSurah: ns, endAyah: na - 1 };
+}
+
+/** Human label like "Al-Baqarah 2:30–35" or "Al-Mulk 67:1 – An-Nas 114:6". */
+export function rangeLabel(r: AyahRange): string {
+  const s = getSurah(r.surah);
+  const e = getSurah(r.endSurah);
+  if (r.surah === r.endSurah) return `${s?.name} ${r.surah}:${r.startAyah}–${r.endAyah}`;
+  return `${s?.name} ${r.surah}:${r.startAyah} – ${e?.name} ${r.endSurah}:${r.endAyah}`;
+}

@@ -1,5 +1,14 @@
 # Hifdh Helper — Backend Spec
 
+> **Status (Oct 2026):** Phases 0–4 are built. Student linking uses
+> `student_slots` + a claim code (`create_student_slot` / `claim_student_slot`),
+> not email invites; the earlier `invite_codes` table was dropped in
+> `20261028_001_sprint1_lean.sql`. Assignments may reference a slot
+> (`student_slot_id`) before a student has an account. `assignment_items` and
+> `practice_presets` have `end_surah` so a range can span surahs. Default
+> lesson types are New Lesson, Review (active) and Subac (inactive). Phase 5
+> (parent notes) and Phase 6 are not built.
+
 A phased implementation plan using **Next.js + Supabase**. Each phase has a clear
 goal, the schema it introduces, and acceptance criteria that must pass before
 moving on.
