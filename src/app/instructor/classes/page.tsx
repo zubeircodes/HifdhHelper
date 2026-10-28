@@ -78,7 +78,11 @@ export default function ClassesPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    // Kick off the load from a resolved promise so state updates happen in a
+    // callback, not synchronously inside the effect body.
+    Promise.resolve().then(loadData);
+  }, [loadData]);
 
   async function handleCreateClass(e: React.FormEvent) {
     e.preventDefault();

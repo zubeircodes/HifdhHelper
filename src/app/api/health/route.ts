@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 export async function GET() {
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase.from("profiles").select("id").limit(1);
+    const { error } = await supabase.from("profiles").select("id").limit(1);
 
     if (error) {
       return NextResponse.json(

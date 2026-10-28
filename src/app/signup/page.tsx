@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Wordmark, Eyebrow, IcoCheck } from "@/components/atoms";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 
 const roles = [
@@ -32,7 +31,6 @@ export default function Signup() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [confirmEmail, setConfirmEmail] = useState(false);
-  const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

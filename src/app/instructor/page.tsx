@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Eyebrow, Avatar, Status } from "@/components/atoms";
 import { createClient } from "@/lib/supabase";
-import { formatDate, normalizeItem, ITEM_FIELDS, type Assignment } from "@/lib/assignments";
+import { formatDate } from "@/lib/assignments";
 import Link from "next/link";
 
 interface StudentSlot {
@@ -13,7 +13,12 @@ interface StudentSlot {
   current_verse: string | null;
   claimed_by: string | null;
   halaqa_id: string;
-  latest: Assignment | null;
+  latest_assignment_id: string | null;
+  latest_date: string | null;
+  total_items: number;
+  graded_items: number;
+  passed_items: number;
+  submitted_items: number;
 }
 
 interface Halaqa {
@@ -48,37 +53,9 @@ export default function InstructorDashboard() {
       if (halaqat && halaqat.length > 0) {
         setClasses(halaqat);
 
-        const halaqaIds = halaqat.map((h) => h.id);
-        const { data: slots } = await supabase
-          .from("student_slots")
-          .select("*")
-          .in("halaqa_id", halaqaIds)
-          .order("student_name", { ascending: true });
-
-        if (slots) {
-          // One query for every slot's assignments, newest first; keep the
-          // latest per slot. Replaces 4 round trips per student.
-          const { data: rows } = await supabase
-            .from("assignments")
-            .select(`id, date, student_slot_id, assignment_items(${ITEM_FIELDS})`)
-            .in("student_slot_id", slots.map((s) => s.id))
-            .order("date", { ascending: false })
-            .limit(1000);
-
-          const latestBySlot = new Map<string, Assignment>();
-          /* eslint-disable @typescript-eslint/no-explicit-any */
-          for (const r of (rows || []) as any[]) {
-            if (latestBySlot.has(r.student_slot_id)) continue;
-            latestBySlot.set(r.student_slot_id, {
-              id: r.id,
-              date: r.date,
-              items: (r.assignment_items || []).map(normalizeItem),
-            });
-          }
-          /* eslint-enable @typescript-eslint/no-explicit-any */
-
-          setStudents(slots.map((slot) => ({ ...slot, latest: latestBySlot.get(slot.id) ?? null })));
-        }
+        // One RPC returns every student with a summary of their latest lesson.
+        const { data: roster } = await supabase.rpc("instructor_roster");
+        if (roster) setStudents(roster as StudentSlot[]);
       }
       setLoading(false);
     });
@@ -186,16 +163,19 @@ export default function InstructorDashboard() {
                       {s.current_surah ? `${s.current_surah} : ${s.current_verse || "1"}` : "—"}
                     </td>
                     <td style={{ padding: "16px 0", fontSize: 12.5 }}>
-                      {s.latest ? (() => {
-                        const total = s.latest.items.length;
-                        const graded = s.latest.items.filter((i) => i.evaluation).length;
-                        const passed = s.latest.items.filter((i) => i.evaluation?.result === "pass").length;
+                      {s.latest_assignment_id && s.latest_date ? (() => {
+                        const { total_items: total, graded_items: graded, passed_items: passed, submitted_items: ready } = s;
                         const done = total > 0 && graded === total;
+                        const line = done
+                          ? `${passed}/${total} passed`
+                          : ready > 0 && graded === 0
+                            ? `${ready}/${total} ready to grade`
+                            : `${graded}/${total} graded`;
                         return (
-                          <Link href={`/instructor/evaluate/${s.id}?assignment=${s.latest.id}`} style={{ color: "inherit", textDecoration: "none" }}>
-                            <span className="hh-num" style={{ color: "var(--ink-1)" }}>{formatDate(s.latest.date)}</span>
-                            <span style={{ display: "block", fontSize: 11, marginTop: 2, color: done ? (passed === total ? "var(--pass)" : "var(--ink-2)") : "var(--ink-2)" }}>
-                              {done ? `${passed}/${total} passed` : `${graded}/${total} graded`}
+                          <Link href={`/instructor/evaluate/${s.id}?assignment=${s.latest_assignment_id}`} style={{ color: "inherit", textDecoration: "none" }}>
+                            <span className="hh-num" style={{ color: "var(--ink-1)" }}>{formatDate(s.latest_date)}</span>
+                            <span style={{ display: "block", fontSize: 11, marginTop: 2, color: done && passed === total ? "var(--pass)" : "var(--ink-2)" }}>
+                              {line}
                             </span>
                           </Link>
                         );
