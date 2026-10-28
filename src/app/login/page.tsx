@@ -30,7 +30,9 @@ export default function Login() {
       return;
     }
 
-    router.push("/dashboard");
+    // Honour ?next= set by the auth guard, but only for in-app paths.
+    const next = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("next") : null;
+    router.push(next && next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard");
   }
 
   const bismillahHtml = `بِسۡمِ <rule class=ham_wasl>ٱ</rule>للَّهِ <rule class=ham_wasl>ٱ</rule><rule class=laam_shamsiyah>ل</rule>رَّحۡمَ<rule class=madda_normal>ـٰ</rule>نِ <rule class=ham_wasl>ٱ</rule><rule class=laam_shamsiyah>ل</rule>رَّح<rule class=madda_permissible>ِي</rule>مِ ١`;

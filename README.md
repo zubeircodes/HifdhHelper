@@ -62,4 +62,8 @@ database in order. Apply the latest with `supabase db push` (or paste into the
 SQL editor). `20261028_001_sprint1_lean.sql` drops the old invite-code
 tables, reseeds lesson types, and adds `end_surah` so ranges can cross surahs.
 `20261028_002_student_slot_access.sql` lets a student who claimed a slot read
-and act on assignments made against that slot.
+and act on assignments made against that slot. `20261028_003_instructor_roster.sql`
+adds the `instructor_roster()` function the roster page calls.
+
+Signed-out visitors to `/instructor`, `/student` or `/dashboard` are sent to
+`/login` by `src/proxy.ts`, which also refreshes the Supabase session cookie.

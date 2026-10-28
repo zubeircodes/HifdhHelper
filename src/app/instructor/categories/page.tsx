@@ -46,7 +46,6 @@ function IconBtn({ children, disabled, onClick, title }: { children: React.React
 export default function CategorySettings() {
   const [cats, setCats] = useState<LessonType[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
 
   const loadCategories = useCallback(async () => {
     const supabase = createClient();
@@ -64,7 +63,11 @@ export default function CategorySettings() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { loadCategories(); }, [loadCategories]);
+  useEffect(() => {
+    // Kick off the load from a resolved promise so state updates happen in a
+    // callback, not synchronously inside the effect body.
+    Promise.resolve().then(loadCategories);
+  }, [loadCategories]);
 
   async function updateCat(id: string, field: "name" | "description", val: string) {
     setCats((cs) => cs.map((c) => (c.id === id ? { ...c, [field]: val } : c)));
@@ -98,7 +101,7 @@ export default function CategorySettings() {
     if (!user) return;
 
     const newOrder = cats.length;
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("lesson_types")
       .insert({ instructor_id: user.id, name: "", description: "", sort_order: newOrder })
       .select()
