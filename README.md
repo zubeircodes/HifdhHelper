@@ -50,9 +50,16 @@ DESIGN.md               # Design system spec (palette, type, components, screens
 5. Each student's page shows their recent graded lessons; **View all** shows
    the full history.
 
+Linked students see the same lesson on their phone, listen to each range the
+number of times the teacher set (one listen = one full pass of the range),
+then tap **Mark as ready**. Teachers see listens and the ready flag on the
+grading screens.
+
 ## Database
 
 Migrations live in `supabase/migrations/` and apply cleanly to an empty
 database in order. Apply the latest with `supabase db push` (or paste into the
 SQL editor). `20261028_001_sprint1_lean.sql` drops the old invite-code
 tables, reseeds lesson types, and adds `end_surah` so ranges can cross surahs.
+`20261028_002_student_slot_access.sql` lets a student who claimed a slot read
+and act on assignments made against that slot.

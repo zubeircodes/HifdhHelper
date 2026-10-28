@@ -118,7 +118,9 @@ function EvaluateStudent({ id }: { id: string }) {
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 11, color: "var(--ink-2)", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 4 }}>
-                    {it.lesson_type_name} · ×{it.repetitions}
+                    {it.lesson_type_name} · {student.claimed_by
+                      ? `${Math.min(it.listens, it.repetitions)}/${it.repetitions} listens${it.submitted_at ? " · ready" : ""}`
+                      : `×${it.repetitions}`}
                   </div>
                   <div className="hh-serif" style={{ fontSize: 16, fontWeight: 500 }}>{itemLabel(it)}</div>
                   {it.evaluation?.note && (

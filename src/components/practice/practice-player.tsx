@@ -4,28 +4,16 @@
 // Used on the public landing page (embedded) and the student Practice tab.
 // No backend: pick a surah, a verse range, a reciter, and a repeat count.
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Eyebrow, IcoPlay, IcoPause, IcoBack, IcoFwd, VerseText } from "@/components/atoms";
 import { SURAHS, getSurah } from "@/lib/quran-meta";
 import { getVerseRange } from "@/lib/quran-text";
-import { getAudioUrl, RECITERS, DEFAULT_RECITER } from "@/lib/audio";
-
-interface LoadedVerse {
-  surah: number;
-  verse: number;
-  text: string;
-}
+import { RECITERS, DEFAULT_RECITER } from "@/lib/audio";
+import { useVerseLoop, formatTime } from "./use-verse-loop";
 
 interface PracticePlayerProps {
   /** Embedded inside the landing aside: tighter spacing, capped verse list. */
   embedded?: boolean;
-}
-
-function formatTime(s: number): string {
-  if (!isFinite(s)) return "0:00";
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return `${m}:${String(sec).padStart(2, "0")}`;
 }
 
 const MAX_REPEATS = 100;
@@ -46,29 +34,11 @@ export function PracticePlayer({ embedded = false }: PracticePlayerProps) {
   // Kept as text so the user can clear and retype freely; clamped when read.
   const [repeatsInput, setRepeatsInput] = useState("3");
   const repeats = Math.min(Math.max(parseInt(repeatsInput) || 1, 1), MAX_REPEATS);
-  const [currentRepeat, setCurrentRepeat] = useState(1);
   const [started, setStarted] = useState(false);
-  const [playing, setPlaying] = useState(false);
-  const [currentVerse, setCurrentVerse] = useState(0);
-  const [verses, setVerses] = useState<LoadedVerse[]>([]);
   const [loading, setLoading] = useState(false);
   const [previewVerse, setPreviewVerse] = useState("");
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [audioError, setAudioError] = useState(false);
-
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  // Refs so the audio "ended" handler always sees current values
-  // without re-creating the handler (and without self-referencing a callback).
-  const versesRef = useRef<LoadedVerse[]>([]);
-  const repeatsRef = useRef(repeats);
-  const reciterRef = useRef(reciter);
-  const activeIdxRef = useRef(0);
-  const repeatRef = useRef(1);
-
-  versesRef.current = verses;
-  repeatsRef.current = repeats;
-  reciterRef.current = reciter;
+  const loop = useVerseLoop();
+  const { verses, currentRepeat, playing, currentVerse, currentTime, duration, audioError, activeVerseRef } = loop;
 
   const surah = getSurah(surahNum);
   const insetTone = embedded ? "var(--paper-2)" : "var(--paper-3)";
@@ -81,97 +51,6 @@ export function PracticePlayer({ embedded = false }: PracticePlayerProps) {
     });
     return () => { cancelled = true; };
   }, [surahNum]);
-
-  const getAudio = useCallback(() => {
-    if (!audioRef.current) {
-      const audio = new Audio();
-      audio.preload = "auto";
-      audio.onloadedmetadata = () => setDuration(audio.duration);
-      audio.ontimeupdate = () => setCurrentTime(audio.currentTime);
-      audio.onerror = () => { setPlaying(false); setAudioError(true); };
-      audio.onended = () => {
-        const list = versesRef.current;
-        const idx = activeIdxRef.current;
-        if (idx < list.length - 1) {
-          loadAndPlay(idx + 1);
-          return;
-        }
-        // End of range — next repeat or stop
-        const nextRepeat = repeatRef.current + 1;
-        if (nextRepeat <= repeatsRef.current) {
-          repeatRef.current = nextRepeat;
-          setCurrentRepeat(nextRepeat);
-          loadAndPlay(0);
-        } else {
-          setPlaying(false);
-        }
-      };
-      audioRef.current = audio;
-    }
-    return audioRef.current;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  function loadAndPlay(idx: number) {
-    const v = versesRef.current[idx];
-    if (!v) return;
-    const audio = getAudio();
-    activeIdxRef.current = idx;
-    setCurrentVerse(idx);
-    setAudioError(false);
-    audio.src = getAudioUrl(reciterRef.current, v.surah, v.verse);
-    audio.currentTime = 0;
-    audio.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
-  }
-
-  function togglePlay() {
-    const audio = getAudio();
-    if (playing) {
-      audio.pause();
-      setPlaying(false);
-      return;
-    }
-    if (audio.src && activeIdxRef.current === currentVerse) {
-      audio.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
-    } else {
-      loadAndPlay(currentVerse);
-    }
-  }
-
-  function goTo(idx: number) {
-    const clamped = Math.max(0, Math.min(verses.length - 1, idx));
-    if (playing) {
-      loadAndPlay(clamped);
-      return;
-    }
-    activeIdxRef.current = clamped;
-    setCurrentVerse(clamped);
-    setCurrentTime(0);
-    setDuration(0);
-    const audio = getAudio();
-    const v = verses[clamped];
-    if (v) {
-      audio.src = getAudioUrl(reciter, v.surah, v.verse);
-      audio.load();
-    }
-  }
-
-  // Keep the active ayah in view as playback advances
-  const activeVerseRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    activeVerseRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [currentVerse]);
-
-  // Cleanup audio on unmount
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.onended = null;
-        audioRef.current = null;
-      }
-    };
-  }, []);
 
   async function handleStart() {
     if (!surah) return;
@@ -186,22 +65,13 @@ export function PracticePlayer({ embedded = false }: PracticePlayerProps) {
     setRepeatsInput(String(repeats));
 
     const v = await getVerseRange(surahNum, sv, surahNum, ev);
-    versesRef.current = v;
-    setVerses(v);
-    activeIdxRef.current = 0;
-    repeatRef.current = 1;
-    setCurrentVerse(0);
-    setCurrentRepeat(1);
-    setCurrentTime(0);
-    setDuration(0);
-    setAudioError(false);
+    loop.start(v, repeats, reciter);
     setLoading(false);
     setStarted(true);
   }
 
   function handleBack() {
-    if (audioRef.current) audioRef.current.pause();
-    setPlaying(false);
+    loop.stop();
     setStarted(false);
   }
 
@@ -358,7 +228,7 @@ export function PracticePlayer({ embedded = false }: PracticePlayerProps) {
             <div
               key={`${v.surah}:${v.verse}`}
               ref={active ? activeVerseRef : null}
-              onClick={() => goTo(idx)}
+              onClick={() => loop.goTo(idx)}
               style={{
                 padding: "var(--space-md)",
                 borderBottom: "1px solid var(--rule-1)",
@@ -398,11 +268,11 @@ export function PracticePlayer({ embedded = false }: PracticePlayerProps) {
         </div>
 
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 36, marginTop: 18 }}>
-          <button onClick={() => goTo(currentVerse - 1)} className="hh-btn ghost" aria-label="Previous ayah" style={{ padding: 0, width: 36, height: 36, justifyContent: "center" }}>
+          <button onClick={() => loop.goTo(currentVerse - 1)} className="hh-btn ghost" aria-label="Previous ayah" style={{ padding: 0, width: 36, height: 36, justifyContent: "center" }}>
             <IcoBack s={18} />
           </button>
           <button
-            onClick={togglePlay}
+            onClick={loop.togglePlay}
             aria-label={playing ? "Pause" : "Play"}
             style={{
               width: 56, height: 56, borderRadius: 28,
@@ -413,7 +283,7 @@ export function PracticePlayer({ embedded = false }: PracticePlayerProps) {
           >
             {playing ? <IcoPause s={18} /> : <IcoPlay s={18} />}
           </button>
-          <button onClick={() => goTo(currentVerse + 1)} className="hh-btn ghost" aria-label="Next ayah" style={{ padding: 0, width: 36, height: 36, justifyContent: "center" }}>
+          <button onClick={() => loop.goTo(currentVerse + 1)} className="hh-btn ghost" aria-label="Next ayah" style={{ padding: 0, width: 36, height: 36, justifyContent: "center" }}>
             <IcoFwd s={18} />
           </button>
         </div>
