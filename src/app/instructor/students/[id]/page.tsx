@@ -62,7 +62,7 @@ export default function InstructorStudentPage({ params }: { params: Promise<{ id
   const pending = rows.filter((r) => !r.it.evaluation);
   const passed = graded.filter((r) => r.it.evaluation!.result === "pass").length;
   const visible = showAll ? graded : graded.slice(0, RECENT);
-  const assignHref = `/instructor/assignments/new?student=${student.id}`;
+  const assignHref = `/instructor/assignments/new?student=${student.id}${assignments[0] ? `&from=${assignments[0].id}` : ""}`;
 
   return (
     <>

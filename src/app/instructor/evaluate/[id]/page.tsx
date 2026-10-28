@@ -57,7 +57,7 @@ function EvaluateStudent({ id }: { id: string }) {
   }
 
   const allGraded = !!assignment && assignment.items.length > 0 && assignment.items.every((i) => i.evaluation);
-  const assignHref = `/instructor/assignments/new?student=${student.id}`;
+  const assignHref = `/instructor/assignments/new?student=${student.id}${assignment ? `&from=${assignment.id}` : ""}`;
 
   return (
     <>
