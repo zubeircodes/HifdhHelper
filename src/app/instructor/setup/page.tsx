@@ -11,7 +11,7 @@ export default function InstructorSetup() {
   const [className, setClassName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [createdClass, setCreatedClass] = useState<string | null>(null);
   const router = useRouter();
 
   // Pre-fill name from signup metadata if available
@@ -76,54 +76,31 @@ export default function InstructorSetup() {
       return;
     }
 
-    // Generate invite code
-    const { data: codeData, error: cErr } = await supabase
-      .rpc("generate_invite_code", { halaqa_uuid: halaqa.id });
-
-    if (cErr) {
-      setError(cErr.message);
-      setLoading(false);
-      return;
-    }
-
-    setInviteCode(codeData.code);
+    setCreatedClass(halaqa.name);
     setLoading(false);
   }
 
-  // Step 3: Show invite code
-  if (inviteCode) {
+  // Step 3: class created. Students are added from Classes, which mints a
+  // working per-student claim code; the class-wide invite code no longer exists.
+  if (createdClass) {
     return (
       <div style={{ minHeight: "100vh", background: "var(--paper-1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ textAlign: "center", maxWidth: 400, padding: "0 22px" }}>
+        <div style={{ textAlign: "center", maxWidth: 420, padding: "0 22px" }}>
           <Eyebrow>Your class is ready</Eyebrow>
           <h1 className="hh-display" style={{ fontSize: 32, margin: "12px 0 8px" }}>
-            Share this code
+            {createdClass}
           </h1>
           <p style={{ color: "var(--ink-1)", fontSize: 13, lineHeight: 1.6, margin: "0 0 32px" }}>
-            Give this invite code to your students so they can join your class.
+            Next, add your students. Each one gets their own lesson link you can
+            send to the family &mdash; no sign-up needed on their end.
           </p>
-
-          <div style={{ padding: "24px 32px", background: "var(--paper-3)", marginBottom: 24 }}>
-            <div
-              className="hh-num"
-              style={{
-                fontSize: 36,
-                letterSpacing: "0.2em",
-                fontWeight: 500,
-                color: "var(--ink-0)",
-                userSelect: "all",
-              }}
-            >
-              {inviteCode}
-            </div>
-          </div>
 
           <button
             className="hh-btn primary lg"
-            onClick={() => navigator.clipboard.writeText(inviteCode)}
+            onClick={() => router.push("/instructor/classes")}
             style={{ marginBottom: 12 }}
           >
-            Copy code
+            Add students
           </button>
           <br />
           <button
@@ -131,7 +108,7 @@ export default function InstructorSetup() {
             onClick={() => router.push("/instructor")}
             style={{ marginTop: 8 }}
           >
-            Go to dashboard
+            Skip for now
           </button>
         </div>
       </div>

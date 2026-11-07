@@ -4,6 +4,11 @@ import { useState, useEffect, use } from "react";
 import { Eyebrow, IcoBack, IcoPlay, VerseMark, VerseText } from "@/components/atoms";
 import { createClient } from "@/lib/supabase";
 import { getVerseRange } from "@/lib/quran-text";
+import { GRADE_OPTIONS, type EvalResult } from "@/lib/grade";
+import { formatAyahRange } from "@/lib/format";
+import { getGradableAssignment, gradeItem } from "@/lib/data/grading";
+import { evalOf } from "@/lib/data/normalize";
+import type { AssignmentItemRow } from "@/lib/data/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -24,60 +29,37 @@ export default function EvaluateLesson({ params }: { params: Promise<{ id: strin
   const [categoryName, setCategoryName] = useState("");
   const [categoryDesc, setCategoryDesc] = useState("");
   const [verses, setVerses] = useState<LoadedVerse[]>([]);
-  const [grade, setGrade] = useState<string>("pass");
-  const [mistakes, setMistakes] = useState(0);
+  const [grade, setGrade] = useState<EvalResult>("pass");
   const [note, setNote] = useState("");
+  // The actual assigned item. Everything on this screen derives from it —
+  // previously the mushaf showed a hardcoded Al-Fatihah 1:1-4 placeholder.
+  const [item, setItem] = useState<AssignmentItemRow | null>(null);
+  const [lessonDate, setLessonDate] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const router = useRouter();
 
   async function handleSubmitEval() {
+    if (!item) return;
     setSubmitError("");
     setSubmitting(true);
 
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) { setSubmitting(false); return; }
 
-    // Find today's assignment for this student slot
-    const today = new Date().toISOString().split("T")[0];
-    const { data: assignments } = await supabase
-      .from("assignments")
-      .select("id")
-      .eq("student_slot_id", id)
-      .eq("date", today)
-      .limit(1);
-
-    if (!assignments || assignments.length === 0) {
-      setSubmitError("No assignment found for today. Assign a lesson first.");
-      setSubmitting(false);
-      return;
-    }
-
-    const { data: items } = await supabase
-      .from("assignment_items")
-      .select("id")
-      .eq("assignment_id", assignments[0].id)
-      .eq("lesson_type_id", lessonId)
-      .limit(1);
-
-    if (!items || items.length === 0) {
-      setSubmitError("No assignment item found for this lesson type today.");
-      setSubmitting(false);
-      return;
-    }
-
-    // Create or update evaluation
-    const { error } = await supabase
-      .from("evaluations")
-      .upsert({
-        assignment_item_id: items[0].id,
-        result: grade,
-        note: note || null,
-        evaluated_by: user.id,
-        evaluated_at: new Date().toISOString(),
-      }, { onConflict: "assignment_item_id" });
+    // Grades the item loaded below, which is the student's LATEST assignment
+    // regardless of date. The old code looked up `date = today` and refused
+    // outright when the lesson had been set at the previous class — which is
+    // exactly when a hifdh teacher hears it.
+    const { error } = await gradeItem(supabase, {
+      itemId: item.id,
+      result: grade,
+      note,
+      userId: user.id,
+    });
 
     if (error) {
       setSubmitError(error.message);
@@ -94,30 +76,49 @@ export default function EvaluateLesson({ params }: { params: Promise<{ id: strin
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return;
 
-      // Get student
       const { data: slot } = await supabase
         .from("student_slots")
-        .select("student_name, current_surah, current_verse")
+        .select("student_name")
         .eq("id", id)
         .single();
-
       if (slot) setStudentName(slot.student_name);
 
-      // Get category
       const { data: cat } = await supabase
         .from("lesson_types")
         .select("name, description")
         .eq("id", lessonId)
         .single();
-
       if (cat) {
         setCategoryName(cat.name);
         setCategoryDesc(cat.description || "");
       }
 
-      // Load sample verses (Al-Fatihah 1-4 as placeholder until real assignments exist)
-      const v = await getVerseRange(1, 1, 1, 4);
-      setVerses(v);
+      // The student's latest assignment, whatever its date.
+      const assignment = await getGradableAssignment(supabase, id);
+      const match = assignment?.assignment_items.find(
+        (it) => it.lesson_type_id === lessonId
+      );
+
+      if (!assignment) {
+        setLoadError("No assignment yet. Assign a lesson first.");
+      } else if (!match) {
+        setLoadError("This student has no lesson in this category yet.");
+      } else {
+        setItem(match);
+        setLessonDate(assignment.date);
+        const existing = evalOf(match);
+        if (existing) {
+          setGrade(existing.result);
+          setNote(existing.note ?? "");
+        }
+        // The verses actually assigned. end_surah is populated on every row,
+        // so a cross-surah range renders correctly too.
+        const endSurah = (match as { end_surah?: number }).end_surah ?? match.surah;
+        setVerses(
+          await getVerseRange(match.surah, match.start_ayah, endSurah, match.end_ayah)
+        );
+      }
+
       setLoading(false);
     });
   }, [id, lessonId]);
@@ -145,7 +146,7 @@ export default function EvaluateLesson({ params }: { params: Promise<{ id: strin
           <span style={{ color: "var(--ink-0)" }}>{categoryName}</span>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className="hh-btn primary" disabled={submitting} onClick={handleSubmitEval}>
+          <button className="hh-btn primary" disabled={submitting || !item} onClick={handleSubmitEval}>
             {submitting ? "Submitting..." : "Submit evaluation"}
           </button>
         </div>
@@ -156,11 +157,15 @@ export default function EvaluateLesson({ params }: { params: Promise<{ id: strin
         <div className="hh-evaluate-mushaf">
           <Eyebrow>{categoryName}{categoryDesc ? ` · ${categoryDesc}` : ""}</Eyebrow>
           <h1 className="hh-display" style={{ fontSize: 26, margin: "6px 0 4px" }}>
-            Al-Fātiḥah · 1:1–4
+            {item ? formatAyahRange(item) : "No lesson assigned"}
           </h1>
           <div style={{ fontSize: 12.5, color: "var(--ink-2)", marginBottom: 32 }}>
             {studentName}
+            {lessonDate ? ` · assigned ${lessonDate}` : ""}
           </div>
+          {loadError && (
+            <p style={{ color: "var(--fail)", fontSize: 12.5, marginBottom: 20 }}>{loadError}</p>
+          )}
 
           <div style={{ background: "var(--paper-2)", border: "1px solid var(--rule-1)", padding: "24px 28px" }}>
             {verses.map((v) => (
@@ -204,38 +209,21 @@ export default function EvaluateLesson({ params }: { params: Promise<{ id: strin
           <div>
             <Eyebrow>Result</Eyebrow>
             <div style={{ marginTop: 14, display: "flex", gap: 1, background: "var(--rule-1)", border: "1px solid var(--rule-1)" }}>
-              {[
-                { k: "pass", label: "Pass" },
-                { k: "partial", label: "Partial" },
-                { k: "fail", label: "Redo" },
-              ].map((opt) => {
-                const active = grade === opt.k;
+              {GRADE_OPTIONS.map((opt) => {
+                const active = grade === opt.value;
                 return (
-                  <button key={opt.k} onClick={() => setGrade(opt.k)}
+                  <button key={opt.value} onClick={() => setGrade(opt.value)}
                     style={{
                       flex: 1, padding: "12px 0",
                       background: active ? "var(--paper-2)" : "var(--paper-1)",
                       border: 0,
-                      color: active ? `var(--${opt.k})` : "var(--ink-1)",
+                      color: active ? `var(--${opt.value})` : "var(--ink-1)",
                       fontWeight: active ? 500 : 400, fontSize: 13, cursor: "pointer",
                     }}>
                     {opt.label}
                   </button>
                 );
               })}
-            </div>
-          </div>
-
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-              <Eyebrow>Corrections</Eyebrow>
-              <span className="hh-num" style={{ fontSize: 13, fontWeight: 500 }}>{mistakes}</span>
-            </div>
-            <input type="range" min="0" max="20" value={mistakes}
-              onChange={(e) => setMistakes(+e.target.value)}
-              style={{ width: "100%", accentColor: "var(--ink-0)" }} />
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 10.5, color: "var(--ink-3)" }}>
-              <span>0</span><span>20+</span>
             </div>
           </div>
 

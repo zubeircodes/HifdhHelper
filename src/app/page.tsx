@@ -39,9 +39,9 @@ export default function Landing() {
           <div style={{ maxWidth: 420 }}>
             <Eyebrow>For schools &amp; teachers</Eyebrow>
             <h1 className="hh-display hh-hero-title" style={{ fontSize: 40, margin: "16px 0 18px" }}>
-              Run your
+              Every student&apos;s lesson,
               <br />
-              <span style={{ fontStyle: "italic", color: "var(--sage-deep)" }}>halaqah</span> here, too.
+              <span style={{ fontStyle: "italic", color: "var(--sage-deep)" }}>in one place.</span>
             </h1>
             <p style={{ fontSize: 14.5, lineHeight: 1.65, color: "var(--ink-1)", margin: "0 0 28px" }}>
               Assign daily lessons to each student, set how many times they should

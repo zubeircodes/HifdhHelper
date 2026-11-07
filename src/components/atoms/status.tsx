@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 
 interface StatusProps {
-  kind: "pass" | "partial" | "fail" | "muted";
+  kind: "pass" | "partial" | "redo" | "muted";
   children: ReactNode;
 }
 

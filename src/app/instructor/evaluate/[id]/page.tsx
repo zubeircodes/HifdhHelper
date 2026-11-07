@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
+import { type EvalResult } from "@/lib/grade";
+import { getGradableAssignment } from "@/lib/data/grading";
+import { evalOf } from "@/lib/data/normalize";
 import { Eyebrow, Avatar, IcoBack, IcoFwd, Status } from "@/components/atoms";
 import { createClient } from "@/lib/supabase";
 import Link from "next/link";
@@ -21,7 +24,7 @@ interface LessonType {
 
 interface EvalStatus {
   lesson_type_id: string;
-  result: "pass" | "partial" | "fail" | null;
+  result: EvalResult | null;
 }
 
 function getInitials(name: string): string {
@@ -62,41 +65,18 @@ export default function EvaluateStudentLessons({ params }: { params: Promise<{ i
 
       if (types) setCategories(types);
 
-      // Get today's evaluation statuses
+      // Evaluation statuses for the student's LATEST assignment, whatever its
+      // date. Scoping this to `date = today` made a lesson set at the previous
+      // class invisible here and ungradeable on the next screen.
       if (slot) {
-        const today = new Date().toISOString().split("T")[0];
-
-        const { data: assignments } = await supabase
-          .from("assignments")
-          .select("id")
-          .eq("student_slot_id", slot.id)
-          .eq("date", today)
-          .limit(1);
-
-        if (assignments && assignments.length > 0) {
-          const { data: items } = await supabase
-            .from("assignment_items")
-            .select("id, lesson_type_id")
-            .eq("assignment_id", assignments[0].id);
-
-          if (items && items.length > 0) {
-            const itemIds = items.map((i) => i.id);
-            const { data: evals } = await supabase
-              .from("evaluations")
-              .select("assignment_item_id, result")
-              .in("assignment_item_id", itemIds);
-
-            if (evals) {
-              const statuses: EvalStatus[] = items.map((item) => {
-                const ev = evals.find((e) => e.assignment_item_id === item.id);
-                return {
-                  lesson_type_id: item.lesson_type_id,
-                  result: ev ? (ev.result as "pass" | "partial" | "fail") : null,
-                };
-              });
-              setEvalStatuses(statuses);
-            }
-          }
+        const assignment = await getGradableAssignment(supabase, slot.id);
+        if (assignment) {
+          setEvalStatuses(
+            assignment.assignment_items.map((item) => ({
+              lesson_type_id: item.lesson_type_id,
+              result: evalOf(item)?.result ?? null,
+            }))
+          );
         }
       }
 

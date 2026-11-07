@@ -73,14 +73,16 @@ export function PracticePlayer({ embedded = false }: PracticePlayerProps) {
   const surah = getSurah(surahNum);
   const insetTone = embedded ? "var(--paper-2)" : "var(--paper-3)";
 
-  // Load a preview verse when surah changes
+  // Load a preview verse when surah changes. The embedded landing player skips
+  // it so the page does not grow on its own a second after it opens.
   useEffect(() => {
+    if (embedded) return;
     let cancelled = false;
     getVerseRange(surahNum, 1, surahNum, 1).then((v) => {
       if (!cancelled) setPreviewVerse(v[0]?.text || "");
     });
     return () => { cancelled = true; };
-  }, [surahNum]);
+  }, [surahNum, embedded]);
 
   const getAudio = useCallback(() => {
     if (!audioRef.current) {
@@ -297,7 +299,7 @@ export function PracticePlayer({ embedded = false }: PracticePlayerProps) {
           </div>
         </div>
 
-        {previewVerse && (
+        {!embedded && previewVerse && (
           <div style={{ padding: "22px 20px", background: insetTone, textAlign: "center", marginBottom: 24 }}>
             <div className="hh-eyebrow" style={{ marginBottom: 8 }}>Preview · {surah?.name} 1</div>
             <VerseText html={previewVerse} style={{ fontSize: "1.5rem", textAlign: "center" }} />
