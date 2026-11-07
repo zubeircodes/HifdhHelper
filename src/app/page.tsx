@@ -6,7 +6,9 @@ import { PracticePlayer } from "@/components/practice/practice-player";
 import Link from "next/link";
 
 export default function Landing() {
-  const [showInfo, setShowInfo] = useState(true);
+  // Opens on the practice tool: "What are you memorizing?" and nothing else.
+  // The teacher panel extends the layout to two columns only on click.
+  const [showInfo, setShowInfo] = useState(false);
 
   return (
     <div className={`hh-landing${showInfo ? " is-expanded" : ""}`}>
