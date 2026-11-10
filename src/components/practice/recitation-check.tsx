@@ -150,6 +150,9 @@ interface RecitationCheckProps {
 
 const LANG = "ar-SA";
 
+/** How long to wait for `onstart` before declaring the start a silent failure. */
+const START_TIMEOUT_MS = 2500;
+
 export function RecitationCheck({ words, onComplete }: RecitationCheckProps) {
   const env = useSyncExternalStore(subscribeNoop, clientEnv, () => SERVER_ENV);
   const [mode, setMode] = useState<RecitationMode>("utterance");
@@ -172,6 +175,9 @@ export function RecitationCheck({ words, onComplete }: RecitationCheckProps) {
   const revealedRef = useRef<ReadonlySet<number>>(new Set());
   const waitModeRef = useRef(waitMode);
   const doneRef = useRef(false);
+  // start() can resolve into silence: no onstart, no onerror, nothing. That is
+  // indistinguishable from a dead button, so time it out and say so.
+  const startWatchdogRef = useRef<number | null>(null);
 
   waitModeRef.current = waitMode;
 
@@ -202,6 +208,10 @@ export function RecitationCheck({ words, onComplete }: RecitationCheckProps) {
       sessionFinalRef.current = [];
 
       rec.onstart = () => {
+        if (startWatchdogRef.current !== null) {
+          window.clearTimeout(startWatchdogRef.current);
+          startWatchdogRef.current = null;
+        }
         setListening(true);
         setDiag((d) => ({ ...d, sessions: d.sessions + 1 }));
       };
@@ -301,18 +311,41 @@ export function RecitationCheck({ words, onComplete }: RecitationCheckProps) {
       const rec = spawn(ctor);
       recRef.current = rec;
       rec.start();
+      if (startWatchdogRef.current !== null) window.clearTimeout(startWatchdogRef.current);
+      startWatchdogRef.current = window.setTimeout(() => {
+        startWatchdogRef.current = null;
+        setDiag((d) =>
+          d.sessions > 0
+            ? d
+            : {
+                ...d,
+                lastError:
+                  "Recognition never started: no onstart and no error within 2.5s. " +
+                  "Usually the microphone is blocked for this site, there is no audio " +
+                  "input, or the OS speech service is unavailable.",
+              },
+        );
+      }, START_TIMEOUT_MS);
     } catch (err) {
       setDiag((d) => ({ ...d, lastError: String(err) }));
     }
   }, [spawn]);
 
   const stop = useCallback(() => {
+    if (startWatchdogRef.current !== null) {
+      window.clearTimeout(startWatchdogRef.current);
+      startWatchdogRef.current = null;
+    }
     wantRef.current = false;
     recRef.current?.stop();
     setListening(false);
   }, []);
 
   const reset = useCallback(() => {
+    if (startWatchdogRef.current !== null) {
+      window.clearTimeout(startWatchdogRef.current);
+      startWatchdogRef.current = null;
+    }
     wantRef.current = false;
     recRef.current?.abort();
     confirmedRef.current = [];
