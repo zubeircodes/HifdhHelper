@@ -15,6 +15,9 @@ import { expectedWordsFromVerses, type ExpectedWord } from "@/lib/recitation";
 import { getSampleRange } from "@/lib/recitation-samples";
 import { RecitationCheck } from "@/components/practice/recitation-check";
 
+// Bump when the harness changes shape, so a stale page is obvious on sight.
+const HARNESS_BUILD = "3 · bundled presets · capability banner";
+
 interface Preset {
   label: string;
   surah: number;
@@ -202,6 +205,20 @@ export default function RecitePage() {
           <RecitationCheck key={`${surah}:${from}-${to}`} words={words} />
         </>
       )}
+
+      {/* Build marker: if this line is missing, the page being viewed is stale. */}
+      <p
+        style={{
+          marginTop: 36,
+          paddingTop: 12,
+          borderTop: "1px solid var(--rule-1)",
+          fontSize: 10.5,
+          color: "var(--ink-3)",
+          letterSpacing: "0.04em",
+        }}
+      >
+        HARNESS BUILD {HARNESS_BUILD}
+      </p>
     </div>
   );
 }

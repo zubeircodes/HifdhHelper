@@ -16,7 +16,7 @@
 // "has a final result EVER arrived" is rendered on screen: that single line is
 // the experiment's result.
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, useSyncExternalStore } from "react";
 import { Eyebrow } from "@/components/atoms";
 import {
   matchLive,
@@ -72,6 +72,44 @@ function getSpeechCtor(): { ctor: SpeechCtor | null; global: string | null } {
   return { ctor: null, global: null };
 }
 
+/* ── Environment, read on mount so the page reports itself before Start ── */
+
+export interface SpeechEnv {
+  known: boolean;
+  apiGlobal: string | null;
+  secure: boolean;
+  ua: string;
+  isAppleWebKit: boolean;
+}
+
+const SERVER_ENV: SpeechEnv = {
+  known: false,
+  apiGlobal: null,
+  secure: false,
+  ua: "",
+  isAppleWebKit: false,
+};
+
+let cachedEnv: SpeechEnv | null = null;
+
+function clientEnv(): SpeechEnv {
+  if (!cachedEnv) {
+    const { global } = getSpeechCtor();
+    const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+    cachedEnv = {
+      known: true,
+      apiGlobal: global,
+      secure: typeof window !== "undefined" && window.isSecureContext,
+      ua,
+      // Every browser on iOS is WebKit, and desktop Safari shares the engine.
+      isAppleWebKit: /AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg\//.test(ua),
+    };
+  }
+  return cachedEnv;
+}
+
+const subscribeNoop = () => () => {};
+
 /* ── Diagnostics ── */
 
 interface Diag {
@@ -113,6 +151,7 @@ interface RecitationCheckProps {
 const LANG = "ar-SA";
 
 export function RecitationCheck({ words, onComplete }: RecitationCheckProps) {
+  const env = useSyncExternalStore(subscribeNoop, clientEnv, () => SERVER_ENV);
   const [mode, setMode] = useState<RecitationMode>("utterance");
   const [waitMode, setWaitMode] = useState(true);
   const [listening, setListening] = useState(false);
@@ -308,8 +347,49 @@ export function RecitationCheck({ words, onComplete }: RecitationCheckProps) {
   const complete = state.cursor >= words.length;
   const progress = words.length ? Math.round((state.cursor / words.length) * 100) : 0;
 
+  const blocked = env.known && (!env.apiGlobal || !env.secure);
+
   return (
     <div>
+      {blocked && (
+        <div
+          style={{
+            padding: "14px 16px",
+            marginBottom: 18,
+            background: "var(--paper-3)",
+            borderLeft: "3px solid var(--fail)",
+            fontSize: 13,
+            lineHeight: 1.6,
+          }}
+        >
+          <strong>This browser can&apos;t start speech recognition.</strong>
+          <ul style={{ margin: "8px 0 0", paddingInlineStart: 20 }}>
+            {!env.secure && (
+              <li>
+                <strong>Not a secure context.</strong> Speech recognition needs HTTPS or
+                localhost. A plain <code>http://192.168.x.x</code> address will never work —
+                use an HTTPS tunnel.
+              </li>
+            )}
+            {!env.apiGlobal && (
+              <li>
+                <strong>No Web Speech API found.</strong>{" "}
+                {env.isAppleWebKit ? (
+                  <>
+                    Safari only exposes it when <strong>Siri or Dictation is enabled</strong> in
+                    system settings. On iPhone: Settings → General → Keyboard → Enable
+                    Dictation. On Mac: System Settings → Keyboard → Dictation. Then reload this
+                    page.
+                  </>
+                ) : (
+                  <>This browser has no speech recognition. Try Chrome or Safari.</>
+                )}
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
+
       <RecitedVerse
         words={words}
         status={state.status}
@@ -399,20 +479,15 @@ export function RecitationCheck({ words, onComplete }: RecitationCheckProps) {
         >
           <Row
             k="API global"
-            v={!started ? "not checked yet" : (diag.apiGlobal ?? "none")}
-            bad={started && !diag.apiGlobal}
+            v={!env.known ? "checking…" : (env.apiGlobal ?? "none — see banner above")}
+            bad={env.known && !env.apiGlobal}
           />
           <Row
             k="Secure context"
-            v={
-              !started
-                ? "not checked yet"
-                : diag.secureContext
-                  ? "yes"
-                  : "NO — mic will be blocked"
-            }
-            bad={started && !diag.secureContext}
+            v={!env.known ? "checking…" : env.secure ? "yes" : "NO — mic will be blocked"}
+            bad={env.known && !env.secure}
           />
+          <Row k="Engine" v={!env.known ? "checking…" : env.isAppleWebKit ? "WebKit (Safari)" : "non-WebKit"} />
           <Row k="Mode" v={mode} />
           <Row k="Language" v={LANG} />
           <Row k="Sessions started" v={String(diag.sessions)} />
