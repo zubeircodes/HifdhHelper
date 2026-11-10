@@ -6,12 +6,13 @@
 // little friction as possible. Short passages by default, because proving the
 // engine needs a few ayat, not a juz.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Eyebrow } from "@/components/atoms";
 import { SURAHS, getSurah } from "@/lib/quran-meta";
 import { getVerseRange } from "@/lib/quran-text";
 import { expectedWordsFromVerses, type ExpectedWord } from "@/lib/recitation";
+import { getSampleRange } from "@/lib/recitation-samples";
 import { RecitationCheck } from "@/components/practice/recitation-check";
 
 interface Preset {
@@ -42,11 +43,21 @@ export default function RecitePage() {
     error: string;
   } | null>(null);
 
-  const loading = loaded?.key !== key;
-  const words = loaded?.key === key ? loaded.words : [];
-  const error = loaded?.key === key ? loaded.error : "";
+  // Bundled passages resolve synchronously. Only a custom range pays for the
+  // 3.8 MB corpus, and the UI says so rather than sitting on "Loading".
+  const sample = from <= to ? getSampleRange(surah, from, to) : null;
+  const sampleWords = useMemo(
+    () => (sample ? expectedWordsFromVerses(sample) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [key],
+  );
+
+  const loading = !sampleWords && loaded?.key !== key;
+  const words = sampleWords ?? (loaded?.key === key ? loaded.words : []);
+  const error = sampleWords ? "" : loaded?.key === key ? loaded.error : "";
 
   useEffect(() => {
+    if (sampleWords) return;
     let cancelled = false;
     getVerseRange(surah, from, surah, to)
       .then((verses) => {
@@ -58,7 +69,7 @@ export default function RecitePage() {
     return () => {
       cancelled = true;
     };
-  }, [surah, from, to, key]);
+  }, [surah, from, to, key, sampleWords]);
 
   function applyPreset(p: Preset) {
     setSurah(p.surah);
@@ -173,7 +184,13 @@ export default function RecitePage() {
       )}
 
       {loading ? (
-        <p style={{ color: "var(--ink-2)", fontSize: 13 }}>Loading passage…</p>
+        <p style={{ color: "var(--ink-2)", fontSize: 13, lineHeight: 1.6 }}>
+          Downloading the full Quran text (3.8 MB) for this custom range…
+          <br />
+          <span style={{ fontSize: 11.5, color: "var(--ink-3)" }}>
+            The preset passages above load instantly and need no download.
+          </span>
+        </p>
       ) : words.length === 0 ? (
         <p style={{ color: "var(--ink-2)", fontSize: 13 }}>No words in that range.</p>
       ) : (
