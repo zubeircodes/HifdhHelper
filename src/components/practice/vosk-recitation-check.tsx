@@ -31,6 +31,14 @@ export interface VoskModelOption {
   label: string;
   file: string;
   note: string;
+  /**
+   * Whether the model can be constrained to a word list.
+   *
+   * Vosk needs a dynamic decoding graph (graph/Gr.fst + graph/HCLr.fst) for
+   * this. Models shipping a single static graph/HCLG.fst ignore the grammar
+   * argument entirely, so claiming it applied would be a lie.
+   */
+  supportsGrammar: boolean;
 }
 
 export const VOSK_MODELS: VoskModelOption[] = [
@@ -38,19 +46,26 @@ export const VOSK_MODELS: VoskModelOption[] = [
     key: "ar-mgb2",
     label: "Arabic · MSA (318 MB)",
     file: "/models/vosk-model-ar-mgb2-0.4.tar.gz",
-    note: "Modern Standard Arabic, trained on broadcast news. The real candidate.",
+    note:
+      "Modern Standard Arabic, broadcast news. Static graph (HCLG.fst, 419 MB " +
+      "uncompressed), so it runs open-vocabulary and ignores the grammar.",
+    supportsGrammar: false,
   },
   {
     key: "ar-tn",
     label: "Arabic · Tunisian (158 MB)",
     file: "/models/vosk-model-small-ar-tn-0.1-linto.tar.gz",
-    note: "Lighter, but a dialect model. Useful for testing memory limits.",
+    note:
+      "Half the size and a dynamic graph, so grammar constraint should apply. " +
+      "Dialect mismatch is the trade.",
+    supportsGrammar: true,
   },
   {
     key: "en-small",
     label: "English (40 MB)",
     file: "/models/vosk-model-small-en-us-0.15.tar.gz",
     note: "Won't match Arabic. Only proves the pipeline loads and runs.",
+    supportsGrammar: true,
   },
 ];
 
@@ -185,12 +200,13 @@ export function VoskRecitationCheck({ words }: VoskRecitationCheckProps) {
 
       // A grammar containing words outside the model's lexicon can be rejected
       // outright. Falling back to open recognition is far better than failing.
-      let grammarApplied = useGrammar;
+      const grammarPossible = useGrammar && model.supportsGrammar;
+      let grammarApplied = grammarPossible;
       let recognizer: VoskRecognizer;
       try {
         recognizer = new loaded.KaldiRecognizer(
           ctx.sampleRate,
-          useGrammar ? grammar : undefined,
+          grammarPossible ? grammar : undefined,
         );
       } catch (grammarErr) {
         grammarApplied = false;
@@ -333,9 +349,10 @@ export function VoskRecitationCheck({ words }: VoskRecitationCheckProps) {
         <button
           className="hh-btn ghost"
           onClick={() => setUseGrammar((v) => !v)}
-          disabled={busy || listening}
+          disabled={busy || listening || !model.supportsGrammar}
+          title={model.supportsGrammar ? undefined : "This model has no dynamic graph"}
         >
-          Grammar: {useGrammar ? "on" : "off"}
+          Grammar: {!model.supportsGrammar ? "unavailable" : useGrammar ? "on" : "off"}
         </button>
         <button className="hh-btn ghost" onClick={() => setWaitMode((v) => !v)}>
           {waitMode ? "Wait on mistakes: on" : "Wait on mistakes: off"}
@@ -391,7 +408,15 @@ export function VoskRecitationCheck({ words }: VoskRecitationCheckProps) {
           <Row k="Grammar words" v={diag.grammarWords ? String(diag.grammarWords) : "—"} />
           <Row
             k="Grammar applied"
-            v={diag.phase === "listening" ? (diag.grammarApplied ? "yes" : "no — open recognition") : "—"}
+            v={
+              diag.phase !== "listening"
+                ? "—"
+                : diag.grammarApplied
+                  ? "yes"
+                  : model.supportsGrammar
+                    ? "no — open recognition"
+                    : "no — this model has no dynamic graph"
+            }
           />
           <Row k="Sample rate" v={diag.sampleRate ? `${diag.sampleRate} Hz` : "—"} />
           <Row k="Partial results" v={String(diag.partials)} />
