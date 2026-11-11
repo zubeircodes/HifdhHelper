@@ -1,7 +1,7 @@
 import fs from 'fs';
 import {
   normalizeWord, tokenizeWords, stripTags, expectedWordsFromVerses,
-  matchLive, scoreOf, similarity,
+  matchLive, scoreOf, similarity, wordMatches,
 } from '../src/lib/recitation.ts';
 
 const d = JSON.parse(fs.readFileSync('./public/text/qpc-hafs-tajweed.json','utf8'));
@@ -68,6 +68,20 @@ ok('repeat ignored', st.cursor===2 && st.status[1]==='correct');
 st = matchLive(fatiha, [words[0]], true, new Set([1,2]));
 ok('revealed words skipped', st.cursor===3 && st.status[1]==='revealed');
 ok('reveal counted in score', scoreOf(st).revealed===2);
+
+console.log('\nMSA spelling variant (dagger alef)');
+const sirat = expectedWordsFromVerses([verse(1,6)]).find(w=>w.norm.includes('\u0635\u0631'))!;
+ok('quranic and MSA forms differ', sirat.norm !== sirat.altNorm, `${sirat.norm} vs ${sirat.altNorm}`);
+ok('matches the quranic spelling', wordMatches(sirat, sirat.norm));
+ok('matches the MSA spelling', wordMatches(sirat, sirat.altNorm));
+ok('rejects an unrelated word', !wordMatches(sirat, '\u0643\u062a\u0627\u0628'));
+{
+  const w = expectedWordsFromVerses([1,2,3,4,5,6,7].map(v=>verse(1,v)));
+  const asMsa = w.map(x=>x.altNorm);
+  const st2 = matchLive(w, asMsa, false);
+  ok('whole passage recited in MSA spelling completes', st2.cursor===w.length && st2.status.every(s=>s==='correct'),
+     `cursor=${st2.cursor}/${w.length}`);
+}
 
 console.log('\nsimilarity');
 ok('identical = 1', similarity('كتاب','كتاب')===1);

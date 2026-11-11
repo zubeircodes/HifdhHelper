@@ -45,6 +45,7 @@ if [ -f "$OUT" ]; then
 fi
 
 mkdir -p "$OUT_DIR"
+rm -f "$OUT.partial"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -60,7 +61,10 @@ unzip -q "$TMP/model.zip" -d "$TMP/x"
 DIR="$(find "$TMP/x" -maxdepth 1 -mindepth 1 -type d | head -1)"
 [ -n "$DIR" ] || { echo "no directory inside the zip" >&2; exit 1; }
 
-tar -czf "$OUT" -C "$(dirname "$DIR")" "$(basename "$DIR")"
+# Write to a temp file and move into place, so an interrupted run never leaves
+# a half-written archive that the "already present" check above would skip.
+tar -czf "$OUT.partial" -C "$(dirname "$DIR")" "$(basename "$DIR")"
+mv "$OUT.partial" "$OUT"
 
 echo
 echo "wrote ${OUT#"$ROOT"/}  ($(du -h "$OUT" | cut -f1))"
