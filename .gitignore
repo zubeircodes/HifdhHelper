@@ -58,3 +58,6 @@ __pycache__/
 *.tmp
 *.log
 .cache/
+
+# Vosk models — hundreds of MB, fetched with scripts/fetch-vosk-model.sh
+/public/models/

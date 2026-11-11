@@ -11,6 +11,20 @@ const nextConfig: NextConfig = {
   //
   // Hostnames only, no scheme and no port. `*` matches exactly one label.
   // Dev-only; it has no effect on `next build` or production.
+  // The acoustic models are immutable and hundreds of megabytes. Without this
+  // they are refetched on every page load, which dominates start-up time on a
+  // phone. The filename carries the version, so caching forever is safe.
+  async headers() {
+    return [
+      {
+        source: "/models/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+    ];
+  },
+
   allowedDevOrigins: [
     "*.ngrok-free.dev",
     "*.ngrok-free.app",
