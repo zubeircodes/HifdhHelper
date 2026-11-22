@@ -58,3 +58,6 @@ __pycache__/
 *.tmp
 *.log
 .cache/
+
+# ASR benchmark models and clips (scripts/asr-bench/fetch.sh)
+/.asr-bench/
