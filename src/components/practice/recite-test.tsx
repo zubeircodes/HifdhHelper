@@ -417,6 +417,19 @@ function HiddenText({
   expected, test, verses, listening,
 }: { expected: ExpectedWord[]; test: TestState; verses: LoopVerse[]; listening: boolean }) {
   const current = expected[test.cursor];
+  const markerRef = useRef<HTMLSpanElement>(null);
+
+  // Keep the next word in view as the text grows past the bottom of the box.
+  useEffect(() => {
+    const marker = markerRef.current;
+    const box = marker?.closest<HTMLElement>(".hh-practice-verses");
+    if (!marker || !box) return;
+    const m = marker.getBoundingClientRect();
+    const b = box.getBoundingClientRect();
+    if (m.top >= b.top && m.bottom <= b.bottom - b.height / 3) return;
+    box.scrollTo({ top: box.scrollTop + m.top - b.top - b.height * 0.4, behavior: "smooth" });
+  }, [test.cursor]);
+
   return (
     <div>
       {verses.map((v) => {
@@ -437,6 +450,7 @@ function HiddenText({
                 <VerseMark n={v.verse} size={24} />
               ) : (
                 <span
+                  ref={markerRef}
                   aria-label="Next word"
                   style={{
                     display: "inline-block",
