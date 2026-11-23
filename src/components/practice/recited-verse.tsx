@@ -6,6 +6,7 @@
 // colour. This renders one span per word instead, keeping each word's <rule>
 // tags inside its span so tajweed colouring survives alongside the status.
 
+import { useEffect, useRef } from "react";
 import { VerseMark } from "@/components/atoms";
 import type { ExpectedWord, WordStatus } from "@/lib/recitation";
 
@@ -39,6 +40,17 @@ export function RecitedVerse({
   onReveal,
   fontSize = 30,
 }: RecitedVerseProps) {
+  const cursorRef = useRef<HTMLSpanElement>(null);
+
+  // Keep the word being listened for on screen as recitation moves down the page.
+  useEffect(() => {
+    const el = cursorRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    if (r.top >= 0 && r.bottom <= window.innerHeight * 0.66) return;
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [cursor]);
+
   return (
     <div
       className="hh-arabic"
@@ -68,6 +80,7 @@ export function RecitedVerse({
         return (
           <span key={`${w.surah}:${w.verse}:${i}`}>
             <span
+              ref={isCursor ? cursorRef : undefined}
               style={style}
               onClick={onReveal ? () => onReveal(i) : undefined}
               title={onReveal ? "Tap to reveal" : undefined}
