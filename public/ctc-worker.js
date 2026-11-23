@@ -1,0 +1,201 @@
+// CTC recognition worker: downloads, caches and runs the Quran wav2vec2 model.
+//
+// Plain JS in public/ on purpose: Next 16.2's Turbopack emits a TypeScript
+// worker as a raw asset instead of compiling it. onnxruntime-web is imported
+// from the CDN at the exact version pinned in src/lib/ctc/config.ts, which
+// sends the URLs with the "load" message so they live in one place.
+//
+// Runs off the main thread so a slow phone CPU never stalls the UI. The model
+// is fetched once into the Cache API and reused on every later visit.
+//
+// Protocol (see src/lib/ctc/engine.ts):
+//   in:  { type: "probe", modelUrl }
+//      | { type: "load", modelUrl, modelBytes, graphUrl, weightsName, ortUrl, wasmPath }
+//      | { type: "run", id, audio, length }
+//   out: { type: "cached", cached } | { type: "progress", loaded, total }
+//      | { type: "ready", backend, loadMs } | { type: "result", id, words, ms }
+//      | { type: "error", message, id? }
+
+const CACHE_NAME = "hh-ctc-model-v1";
+const SAMPLES_PER_FRAME = 320; // wav2vec2: one frame per 20 ms at 16 kHz
+
+/** Output index → character, from the model's vocab.json. 0 is the CTC blank. */
+const VOCAB = {
+  4: "|", 6: "ء", 7: "آ", 8: "أ", 9: "ؤ", 10: "إ", 11: "ئ", 12: "ا", 13: "ب",
+  14: "ة", 15: "ت", 16: "ث", 17: "ج", 18: "ح", 19: "خ", 20: "د", 21: "ذ",
+  22: "ر", 23: "ز", 24: "س", 25: "ش", 26: "ص", 27: "ض", 28: "ط", 29: "ظ",
+  30: "ع", 31: "غ", 32: "ـ", 33: "ف", 34: "ق", 35: "ك", 36: "ل", 37: "م",
+  38: "ن", 39: "ه", 40: "و", 41: "ى", 42: "ي", 43: "ً", 44: "ٌ",
+  45: "ٍ", 46: "َ", 47: "ُ", 48: "ِ", 49: "ّ",
+  50: "ْ", 51: "ٱ", 52: "ٰ", 53: "ٓ", 54: "ۥ", 55: "ۦ",
+};
+const WORD_DELIMITER = 4;
+
+let ort = null;
+let session = null;
+let loading = null;
+
+const post = (msg) => self.postMessage(msg);
+
+async function cachedModel(url) {
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    return await cache.match(url);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The model file as a Blob, from the cache or downloaded into it.
+ *
+ * The download streams straight into the cache rather than through an array:
+ * holding the model in memory twice on the way in is enough for iOS to kill
+ * the tab on a 4 GB iPhone. A Blob read back from the cache can stay on disk.
+ */
+async function modelBlob(url, expectedBytes) {
+  const hit = await cachedModel(url);
+  if (hit) return hit.blob();
+
+  const res = await fetch(url);
+  if (!res.ok || !res.body) throw new Error(`Model download failed (HTTP ${res.status})`);
+  const total = Number(res.headers.get("content-length")) || expectedBytes;
+  let loaded = 0;
+  let lastPost = 0;
+  const counted = res.body.pipeThrough(
+    new TransformStream({
+      transform(chunk, ctl) {
+        loaded += chunk.length;
+        if (loaded - lastPost > 1_000_000 || loaded === total) {
+          post({ type: "progress", loaded, total });
+          lastPost = loaded;
+        }
+        ctl.enqueue(chunk);
+      },
+    }),
+  );
+  const body = new Response(counted, { headers: { "content-type": "application/octet-stream" } });
+
+  let cache = null;
+  try {
+    cache = await caches.open(CACHE_NAME);
+    await cache.put(url, body);
+  } catch {
+    // Storage full or blocked (private mode): fall back to memory for this visit.
+    cache = null;
+  }
+  const blob = cache ? await (await cache.match(url))?.blob() : await body.blob().catch(() => null);
+  if (!blob || blob.size !== total) {
+    await cache?.delete(url);
+    if (!blob && !cache) {
+      // The stream went into the failed put; fetch again into memory.
+      const again = await fetch(url);
+      if (!again.ok) throw new Error(`Model download failed (HTTP ${again.status})`);
+      return again.blob();
+    }
+    throw new Error(`Model download incomplete (${blob ? blob.size : 0} of ${total} bytes)`);
+  }
+  return blob;
+}
+
+/**
+ * The graph comes from our own origin (half a megabyte); its weights point by
+ * offset into the original model file, mounted under `weightsName`. Measured on
+ * a laptop: 0.41 GB once loaded, against 1.07 GB from the single file as bytes.
+ */
+async function createSession(msg, weights) {
+  const res = await fetch(msg.graphUrl);
+  if (!res.ok) throw new Error(`Model graph missing (HTTP ${res.status})`);
+  const graph = new Uint8Array(await res.arrayBuffer());
+  const opts = { externalData: [{ path: msg.weightsName, data: weights }] };
+  if (self.navigator && "gpu" in self.navigator) {
+    try {
+      session = await ort.InferenceSession.create(graph, { ...opts, executionProviders: ["webgpu"] });
+      return "webgpu";
+    } catch {
+      // No adapter, or an op unsupported: fall through to CPU.
+    }
+  }
+  session = await ort.InferenceSession.create(graph, { ...opts, executionProviders: ["wasm"] });
+  return "wasm";
+}
+
+function load(msg) {
+  loading ??= (async () => {
+    const t0 = performance.now();
+    ort ??= await import(msg.ortUrl);
+    ort.env.wasm.wasmPaths = msg.wasmPath;
+    const weights = await modelBlob(msg.modelUrl, msg.modelBytes);
+    const backend = await createSession(msg, weights);
+    // The first run compiles kernels; do it now rather than on the first word.
+    await infer(new Float32Array(16000), 16000);
+    post({ type: "ready", backend, loadMs: Math.round(performance.now() - t0) });
+  })().catch((e) => {
+    loading = null;
+    post({ type: "error", message: e instanceof Error ? e.message : String(e) });
+  });
+  return loading;
+}
+
+/**
+ * Greedy CTC decode with word timings.
+ *
+ * `audio` may be zero-padded past `length` (fixed lengths keep WebGPU from
+ * recompiling for every window size); frames past the real audio are ignored.
+ */
+async function infer(audio, length) {
+  if (!session) throw new Error("Model not loaded");
+  const input = new ort.Tensor("float32", audio, [1, audio.length]);
+  const out = await session.run({ input_values: input });
+  const logits = out.logits;
+  const [, frames, vocab] = logits.dims;
+  const data = logits.data;
+  const realFrames = Math.min(frames, Math.ceil(length / SAMPLES_PER_FRAME));
+
+  const words = [];
+  let cur = null;
+  let last = -1;
+  for (let f = 0; f < realFrames; f++) {
+    let best = 0;
+    let bestV = -Infinity;
+    const row = f * vocab;
+    for (let k = 0; k < vocab; k++) {
+      const v = data[row + k];
+      if (v > bestV) { bestV = v; best = k; }
+    }
+    if (best !== last) {
+      if (best === WORD_DELIMITER) {
+        if (cur) words.push(cur);
+        cur = null;
+      } else if (VOCAB[best]) {
+        if (!cur) cur = { text: "", startFrame: f, endFrame: f };
+        cur.text += VOCAB[best];
+        cur.endFrame = f;
+      }
+    } else if (cur && VOCAB[best]) {
+      cur.endFrame = f;
+    }
+    last = best;
+  }
+  if (cur) words.push(cur);
+  logits.dispose?.();
+  input.dispose?.();
+  return words;
+}
+
+self.onmessage = async (e) => {
+  const msg = e.data;
+  try {
+    if (msg.type === "probe") {
+      post({ type: "cached", cached: !!(await cachedModel(msg.modelUrl)) });
+    } else if (msg.type === "load") {
+      await load(msg);
+    } else if (msg.type === "run") {
+      const t0 = performance.now();
+      const words = await infer(msg.audio, msg.length);
+      post({ type: "result", id: msg.id, words, ms: Math.round(performance.now() - t0) });
+    }
+  } catch (err) {
+    post({ type: "error", message: err instanceof Error ? err.message : String(err), id: msg.id });
+  }
+};

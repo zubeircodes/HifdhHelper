@@ -763,3 +763,9 @@ rule.slnt                  { color: var(--tj-silent); opacity: 0.7; }
     justify-content: center;
   }
 }
+
+/* Recite test: the marker where the next hidden word goes */
+@keyframes hh-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}

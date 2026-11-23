@@ -10,6 +10,7 @@ import { SURAHS, getSurah } from "@/lib/quran-meta";
 import { getVerseRange } from "@/lib/quran-text";
 import { RECITERS, DEFAULT_RECITER } from "@/lib/audio";
 import { useVerseLoop, formatTime } from "./use-verse-loop";
+import { ReciteTest, ExperimentalBadge } from "./recite-test";
 
 interface PracticePlayerProps {
   /** Embedded inside the landing aside: tighter spacing, capped verse list. */
@@ -37,6 +38,7 @@ export function PracticePlayer({ embedded = false }: PracticePlayerProps) {
   const [started, setStarted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [previewVerse, setPreviewVerse] = useState("");
+  const [testing, setTesting] = useState(false);
   const loop = useVerseLoop();
   const { verses, currentRepeat, playing, currentVerse, currentTime, duration, audioError, activeVerseRef } = loop;
 
@@ -75,7 +77,14 @@ export function PracticePlayer({ embedded = false }: PracticePlayerProps) {
 
   function handleBack() {
     loop.stop();
+    setTesting(false);
     setStarted(false);
+  }
+
+  function handleTest() {
+    // The reciter's audio would be heard by the microphone.
+    loop.stop();
+    setTesting(true);
   }
 
   // ── Picker ──
@@ -193,6 +202,18 @@ export function PracticePlayer({ embedded = false }: PracticePlayerProps) {
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
   const rangeLabel = `${surah?.name} ${surahNum}:${from}–${to}`;
 
+  if (testing) {
+    return (
+      <ReciteTest
+        verses={verses}
+        reciter={reciter}
+        rangeLabel={rangeLabel}
+        embedded={embedded}
+        onExit={() => setTesting(false)}
+      />
+    );
+  }
+
   return (
     <div
       className={embedded ? "hh-practice hh-practice--embedded hh-practice--playing" : "hh-practice hh-practice--playing"}
@@ -296,6 +317,14 @@ export function PracticePlayer({ embedded = false }: PracticePlayerProps) {
             Couldn&apos;t load audio for this ayah. Check your connection and try again.
           </p>
         )}
+
+        <button
+          className="hh-btn"
+          onClick={handleTest}
+          style={{ width: "100%", justifyContent: "center", marginTop: 18, gap: 10 }}
+        >
+          Test yourself from memory <ExperimentalBadge />
+        </button>
       </div>
     </div>
   );
