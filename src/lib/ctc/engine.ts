@@ -10,7 +10,7 @@
 // sure where it ended; only settled words are handed to the caller. Anything
 // nearer the end of the window may be half-spoken and is never judged.
 
-import { MODEL_URL, MODEL_BYTES, ORT_URL, ORT_WASM_PATH, SAMPLE_RATE, SAMPLES_PER_FRAME } from "./config";
+import { GRAPH_URL, MODEL_URL, MODEL_BYTES, ORT_URL, WEIGHTS_NAME, ORT_WASM_PATH, SAMPLE_RATE, SAMPLES_PER_FRAME } from "./config";
 
 /** A word as the worker reports it (public/ctc-worker.js), frames relative to the window. */
 interface HeardWord {
@@ -100,6 +100,8 @@ export function loadModel() {
     type: "load",
     modelUrl: MODEL_URL,
     modelBytes: MODEL_BYTES,
+    graphUrl: GRAPH_URL,
+    weightsName: WEIGHTS_NAME,
     ortUrl: ORT_URL,
     wasmPath: ORT_WASM_PATH,
   });

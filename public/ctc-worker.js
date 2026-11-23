@@ -9,7 +9,8 @@
 // is fetched once into the Cache API and reused on every later visit.
 //
 // Protocol (see src/lib/ctc/engine.ts):
-//   in:  { type: "probe", modelUrl } | { type: "load", modelUrl, modelBytes, ortUrl, wasmPath }
+//   in:  { type: "probe", modelUrl }
+//      | { type: "load", modelUrl, modelBytes, graphUrl, weightsName, ortUrl, wasmPath }
 //      | { type: "run", id, audio, length }
 //   out: { type: "cached", cached } | { type: "progress", loaded, total }
 //      | { type: "ready", backend, loadMs } | { type: "result", id, words, ms }
@@ -45,49 +46,77 @@ async function cachedModel(url) {
   }
 }
 
-async function download(url, expectedBytes) {
+/**
+ * The model file as a Blob, from the cache or downloaded into it.
+ *
+ * The download streams straight into the cache rather than through an array:
+ * holding the model in memory twice on the way in is enough for iOS to kill
+ * the tab on a 4 GB iPhone. A Blob read back from the cache can stay on disk.
+ */
+async function modelBlob(url, expectedBytes) {
   const hit = await cachedModel(url);
-  if (hit) return new Uint8Array(await hit.arrayBuffer());
+  if (hit) return hit.blob();
 
   const res = await fetch(url);
   if (!res.ok || !res.body) throw new Error(`Model download failed (HTTP ${res.status})`);
   const total = Number(res.headers.get("content-length")) || expectedBytes;
-  const buf = new Uint8Array(total);
-  const reader = res.body.getReader();
   let loaded = 0;
   let lastPost = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (loaded + value.length > buf.length) throw new Error("Model larger than expected");
-    buf.set(value, loaded);
-    loaded += value.length;
-    if (loaded - lastPost > 1_000_000 || loaded === total) {
-      post({ type: "progress", loaded, total });
-      lastPost = loaded;
-    }
-  }
-  if (loaded !== total) throw new Error(`Model download incomplete (${loaded} of ${total} bytes)`);
+  const counted = res.body.pipeThrough(
+    new TransformStream({
+      transform(chunk, ctl) {
+        loaded += chunk.length;
+        if (loaded - lastPost > 1_000_000 || loaded === total) {
+          post({ type: "progress", loaded, total });
+          lastPost = loaded;
+        }
+        ctl.enqueue(chunk);
+      },
+    }),
+  );
+  const body = new Response(counted, { headers: { "content-type": "application/octet-stream" } });
 
+  let cache = null;
   try {
-    const cache = await caches.open(CACHE_NAME);
-    await cache.put(url, new Response(buf, { headers: { "content-type": "application/octet-stream" } }));
+    cache = await caches.open(CACHE_NAME);
+    await cache.put(url, body);
   } catch {
-    // Storage full or blocked (private mode): works for this visit, downloads again next time.
+    // Storage full or blocked (private mode): fall back to memory for this visit.
+    cache = null;
   }
-  return buf;
+  const blob = cache ? await (await cache.match(url))?.blob() : await body.blob().catch(() => null);
+  if (!blob || blob.size !== total) {
+    await cache?.delete(url);
+    if (!blob && !cache) {
+      // The stream went into the failed put; fetch again into memory.
+      const again = await fetch(url);
+      if (!again.ok) throw new Error(`Model download failed (HTTP ${again.status})`);
+      return again.blob();
+    }
+    throw new Error(`Model download incomplete (${blob ? blob.size : 0} of ${total} bytes)`);
+  }
+  return blob;
 }
 
-async function createSession(bytes) {
+/**
+ * The graph comes from our own origin (half a megabyte); its weights point by
+ * offset into the original model file, mounted under `weightsName`. Measured on
+ * a laptop: 0.41 GB once loaded, against 1.07 GB from the single file as bytes.
+ */
+async function createSession(msg, weights) {
+  const res = await fetch(msg.graphUrl);
+  if (!res.ok) throw new Error(`Model graph missing (HTTP ${res.status})`);
+  const graph = new Uint8Array(await res.arrayBuffer());
+  const opts = { externalData: [{ path: msg.weightsName, data: weights }] };
   if (self.navigator && "gpu" in self.navigator) {
     try {
-      session = await ort.InferenceSession.create(bytes, { executionProviders: ["webgpu"] });
+      session = await ort.InferenceSession.create(graph, { ...opts, executionProviders: ["webgpu"] });
       return "webgpu";
     } catch {
       // No adapter, or an op unsupported: fall through to CPU.
     }
   }
-  session = await ort.InferenceSession.create(bytes, { executionProviders: ["wasm"] });
+  session = await ort.InferenceSession.create(graph, { ...opts, executionProviders: ["wasm"] });
   return "wasm";
 }
 
@@ -96,8 +125,8 @@ function load(msg) {
     const t0 = performance.now();
     ort ??= await import(msg.ortUrl);
     ort.env.wasm.wasmPaths = msg.wasmPath;
-    const bytes = await download(msg.modelUrl, msg.modelBytes);
-    const backend = await createSession(bytes);
+    const weights = await modelBlob(msg.modelUrl, msg.modelBytes);
+    const backend = await createSession(msg, weights);
     // The first run compiles kernels; do it now rather than on the first word.
     await infer(new Float32Array(16000), 16000);
     post({ type: "ready", backend, loadMs: Math.round(performance.now() - t0) });
